@@ -30,7 +30,11 @@ class PackratTest < Minitest::Test
 
     def install(config)
       @config = config
-      @present
+      @installed = @present
+    end
+
+    def installed?
+      !!@installed
     end
   end
 

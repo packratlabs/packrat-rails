@@ -25,5 +25,10 @@ Gem::Specification.new do |spec|
   spec.add_dependency "opentelemetry-instrumentation-pg", ">= 0.27"
   spec.add_dependency "opentelemetry-instrumentation-mysql2", ">= 0.27"
   spec.add_dependency "opentelemetry-instrumentation-sidekiq", ">= 0.25"
+  spec.add_dependency "opentelemetry-instrumentation-action_view", ">= 0.7"
+  spec.add_dependency "opentelemetry-instrumentation-redis", ">= 0.25"
+  spec.add_dependency "opentelemetry-instrumentation-aws_sdk", ">= 0.5"
+  spec.add_dependency "opentelemetry-instrumentation-concurrent_ruby", ">= 0.21"
+  spec.add_dependency "opentelemetry-instrumentation-rake", ">= 0.2"
   spec.add_dependency "opentelemetry-instrumentation-logger", ">= 0.1"
 end

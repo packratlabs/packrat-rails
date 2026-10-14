@@ -30,10 +30,10 @@ All configuration is environment variables. There is no initializer.
 | `PACKRAT_DISABLED`              | unset                       | `1` turns the gem off in any environment                     |
 | `PACKRAT_OTEL_INSTRUMENTATIONS` | the list below              | Comma-separated names to add; a leading `-` removes one      |
 
-The instrumentations are `rack`, `action_pack`, `active_job`, `active_record`, `net_http`, `pg`,
-`mysql2`, `sidekiq` and `logger`. One for a library that is not in the app installs nothing.
-`PACKRAT_OTEL_INSTRUMENTATIONS=redis,-pg` adds Redis (with
-`opentelemetry-instrumentation-redis` in the Gemfile) and removes PG. `action_mailer` and
+The instrumentations are `rack`, `action_pack`, `action_view`, `active_job`, `active_record`,
+`net_http`, `pg`, `mysql2`, `sidekiq`, `redis`, `aws_sdk`, `concurrent_ruby`, `rake` and `logger`. One for a library that is not in the app installs nothing.
+`PACKRAT_OTEL_INSTRUMENTATIONS=faraday,-action_view` adds Faraday (with
+`opentelemetry-instrumentation-faraday` in the Gemfile) and removes Action View. `action_mailer` and
 `active_storage` cannot be added: they must load before boot ends.
 
 The service name is `OTEL_SERVICE_NAME`, else `service.name` in `OTEL_RESOURCE_ATTRIBUTES`, else the

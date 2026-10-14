@@ -18,16 +18,17 @@ class SetupTest < PackratTest
 
     assert_kind_of OpenTelemetry::SDK::Logs::LoggerProvider, OpenTelemetry.logger_provider
     assert_match "RootKindSampler", provider.sampler.description
-    assert_equal Packrat::Config::INSTRUMENTATIONS, setup.installed
+    installed = %w[rack action_pack action_view active_job active_record net_http pg mysql2 sidekiq redis aws_sdk concurrent_ruby rake logger]
+    assert_equal installed, setup.installed
     assert_equal({ untraced_endpoints: [ "/up" ] }, @instrumentations["rack"].config)
     assert_kind_of Packrat::Otel::ErrorSpans, @errors.subscribers.sole
     assert_equal "Packrat: sending traces and logs for shop/production to #{URL} " \
-                 "(rack, action_pack, active_job, active_record, net_http, pg, mysql2, sidekiq, logger)", setup.line
+                 "(#{installed.join(', ')})", setup.line
     assert_includes log, setup.line
   end
 
   def test_configure_lists_only_what_installed
-    instrumentations = Hash.new { |hash, name| hash[name] = FakeInstrumentation.new(present: !%w[pg mysql2 sidekiq].include?(name)) }
+    instrumentations = Hash.new { |hash, name| hash[name] = FakeInstrumentation.new(present: %w[rack action_pack active_job active_record net_http logger].include?(name)) }
     setup = run_setup(config, instrumentations:)
 
     assert_equal %w[rack action_pack active_job active_record net_http logger], setup.installed
