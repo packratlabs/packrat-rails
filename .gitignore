@@ -1,0 +1,5 @@
+/Gemfile.lock
+/corpus/generated/
+/corpus/runs/
+/vendor/
+/*.gem
