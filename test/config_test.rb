@@ -8,22 +8,23 @@ class ConfigTest < PackratTest
     assert_equal "https://ingest.packrat.sh/v1/traces", config.traces_endpoint
     assert_equal "https://ingest.packrat.sh/v1/logs", config.logs_endpoint
     assert_equal({ "Authorization" => CANARY }, config.headers)
-    assert_equal %w[rack action_pack active_job active_record net_http pg mysql2 logger], config.instrumentations
+    assert_equal %w[rack action_pack active_job active_record net_http pg mysql2 sidekiq logger], config.instrumentations
     assert config.enabled?
   end
 
   def test_names_come_from_rails_when_the_standard_variables_are_unset
-    config = config({ "HEROKU_SLUG_COMMIT" => "abc123" })
+    config = config({ "HEROKU_SLUG_COMMIT" => "abc123", "DYNO" => "web.1" })
 
     assert_equal "shop", config.service_name
     assert_equal "production", config.environment
-    assert_equal({ "service.name" => "shop", "deployment.environment.name" => "production", "service.version" => "abc123" },
-                 config.resource_attributes)
+    assert_equal({ "service.name" => "shop", "deployment.environment.name" => "production", "service.version" => "abc123",
+                   "service.instance.id" => "web.1" }, config.resource_attributes)
+    assert_equal Socket.gethostname, config({}).resource_attributes["service.instance.id"]
   end
 
   def test_standard_variables_win
     config = config({ "OTEL_SERVICE_NAME" => "storefront", "BUILD_COMMIT" => "abc123",
-                      "OTEL_RESOURCE_ATTRIBUTES" => "deployment.environment=staging,service.version=v9" })
+                      "OTEL_RESOURCE_ATTRIBUTES" => "deployment.environment=staging,service.version=v9,service.instance.id=a" })
 
     assert_equal "storefront", config.service_name
     assert_equal "staging", config.environment
@@ -49,9 +50,9 @@ class ConfigTest < PackratTest
   end
 
   def test_instrumentations_add_and_remove
-    config = config({ "PACKRAT_OTEL_INSTRUMENTATIONS" => "sidekiq, -pg,rack" })
+    config = config({ "PACKRAT_OTEL_INSTRUMENTATIONS" => "redis, -pg,rack,sidekiq" })
 
-    assert_equal %w[rack action_pack active_job active_record net_http mysql2 logger sidekiq], config.instrumentations
+    assert_equal %w[rack action_pack active_job active_record net_http mysql2 sidekiq logger redis], config.instrumentations
   end
 
   def test_app_exports_to_packrat

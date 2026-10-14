@@ -31,15 +31,15 @@ All configuration is environment variables. There is no initializer.
 | `PACKRAT_OTEL_INSTRUMENTATIONS` | the list below              | Comma-separated names to add; a leading `-` removes one      |
 
 The instrumentations are `rack`, `action_pack`, `active_job`, `active_record`, `net_http`, `pg`,
-`mysql2` and `logger`. One for a library that is not in the app installs nothing.
-`PACKRAT_OTEL_INSTRUMENTATIONS=sidekiq,-pg` adds Sidekiq (with
-`opentelemetry-instrumentation-sidekiq` in the Gemfile) and removes PG. `action_mailer` and
+`mysql2`, `sidekiq` and `logger`. One for a library that is not in the app installs nothing.
+`PACKRAT_OTEL_INSTRUMENTATIONS=redis,-pg` adds Redis (with
+`opentelemetry-instrumentation-redis` in the Gemfile) and removes PG. `action_mailer` and
 `active_storage` cannot be added: they must load before boot ends.
 
 The service name is `OTEL_SERVICE_NAME`, else `service.name` in `OTEL_RESOURCE_ATTRIBUTES`, else the
 app's module name (`Shop::Application` is `shop`). The environment is `Rails.env` unless
 `OTEL_RESOURCE_ATTRIBUTES` names one. The version is `BUILD_COMMIT`, `HEROKU_SLUG_COMMIT` or
-`SOURCE_VERSION`. A standard `OTEL_*` variable that is set always wins.
+`SOURCE_VERSION`. The instance is `DYNO`, else the host name. A standard `OTEL_*` variable that is set always wins.
 
 The gem does nothing in the test environment.
 

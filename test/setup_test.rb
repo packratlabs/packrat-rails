@@ -22,12 +22,12 @@ class SetupTest < PackratTest
     assert_equal({ untraced_endpoints: [ "/up" ] }, @instrumentations["rack"].config)
     assert_kind_of Packrat::Otel::ErrorSpans, @errors.subscribers.sole
     assert_equal "Packrat: sending traces and logs for shop/production to #{URL} " \
-                 "(rack, action_pack, active_job, active_record, net_http, pg, mysql2, logger)", setup.line
+                 "(rack, action_pack, active_job, active_record, net_http, pg, mysql2, sidekiq, logger)", setup.line
     assert_includes log, setup.line
   end
 
   def test_configure_lists_only_what_installed
-    instrumentations = Hash.new { |hash, name| hash[name] = FakeInstrumentation.new(present: !%w[pg mysql2].include?(name)) }
+    instrumentations = Hash.new { |hash, name| hash[name] = FakeInstrumentation.new(present: !%w[pg mysql2 sidekiq].include?(name)) }
     setup = run_setup(config, instrumentations:)
 
     assert_equal %w[rack action_pack active_job active_record net_http logger], setup.installed

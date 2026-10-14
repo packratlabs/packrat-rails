@@ -1,3 +1,4 @@
+require "socket"
 require "uri"
 
 module Packrat
@@ -5,7 +6,7 @@ module Packrat
   # wins: the gem fills in only what the standard variables leave empty.
   class Config
     DEFAULT_URL = "https://ingest.packrat.sh".freeze
-    INSTRUMENTATIONS = %w[rack action_pack active_job active_record net_http pg mysql2 logger].freeze
+    INSTRUMENTATIONS = %w[rack action_pack active_job active_record net_http pg mysql2 sidekiq logger].freeze
     COMMIT_VARIABLES = %w[BUILD_COMMIT HEROKU_SLUG_COMMIT SOURCE_VERSION].freeze
     REDACTED = "[redacted]".freeze
 
@@ -79,6 +80,8 @@ module Packrat
         end
         version = service_version
         attributes["service.version"] = version if version && !env_attributes.key?("service.version")
+        # DYNO names the process on Heroku and build.io: web.1, worker.2.
+        attributes["service.instance.id"] = present(@env["DYNO"]) || Socket.gethostname unless env_attributes.key?("service.instance.id")
       end
     end
 

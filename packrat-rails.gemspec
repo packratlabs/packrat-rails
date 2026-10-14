@@ -24,5 +24,6 @@ Gem::Specification.new do |spec|
   spec.add_dependency "opentelemetry-instrumentation-net_http", ">= 0.22"
   spec.add_dependency "opentelemetry-instrumentation-pg", ">= 0.27"
   spec.add_dependency "opentelemetry-instrumentation-mysql2", ">= 0.27"
+  spec.add_dependency "opentelemetry-instrumentation-sidekiq", ">= 0.25"
   spec.add_dependency "opentelemetry-instrumentation-logger", ">= 0.1"
 end
