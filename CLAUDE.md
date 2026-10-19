@@ -1,4 +1,4 @@
-Only report to me in ASD-STE100 Simplified Technical English.
+Write like the developer docs of Heroku or Stripe: plain, direct and task-oriented, in the second person and the active voice, with exact names in code formatting. This applies to reports to me and to everything you write (docs, skills, READMEs, PR descriptions).
 
 # packrat-rails
 
