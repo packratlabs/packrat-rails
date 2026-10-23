@@ -4,7 +4,7 @@ module Packrat
   class Railtie < Rails::Railtie
     initializer "packrat.middleware" do |app|
       Packrat.guard("middleware") do
-        app.config.middleware.insert_before(0, RackSpan) if Packrat.config.enabled? && !Otel.datadog?
+        app.config.middleware.insert_before(0, RackSpan) if Packrat.config.allowed? && !Otel.datadog?
       end
     end
 

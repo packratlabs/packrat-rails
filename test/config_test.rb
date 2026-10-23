@@ -40,13 +40,30 @@ class ConfigTest < PackratTest
   end
 
   def test_off_reasons
-    assert_equal "PACKRAT_INGEST_KEY is not set, so nothing is sent", config({ "PACKRAT_INGEST_KEY" => "" }).off_reason
+    assert_equal "no ingest key is set (PACKRAT_INGEST_KEY or config.ingest_key), so nothing is sent", config({ "PACKRAT_INGEST_KEY" => "" }).off_reason
     assert_equal "PACKRAT_DISABLED is set, so nothing is sent", config({ "PACKRAT_DISABLED" => "1" }).off_reason
     assert_equal "OTEL_SDK_DISABLED is true, so nothing is sent", config({ "OTEL_SDK_DISABLED" => "true" }).off_reason
     assert_nil config({ "PACKRAT_DISABLED" => "1" }, rails_env: "test").off_reason
     refute config(rails_env: "test").enabled?
     refute config({ "PACKRAT_DISABLED" => "1" }).enabled?
     assert config({ "PACKRAT_DISABLED" => "0" }).enabled?
+  end
+
+  def test_the_key_from_the_initializer
+    config = config({ "PACKRAT_INGEST_KEY" => "" })
+    refute config.enabled?
+    assert config.allowed?
+
+    config.ingest_key = CANARY
+    assert_equal CANARY, config.key
+    assert config.enabled?
+  end
+
+  def test_the_variable_wins_over_the_initializer
+    configured = config
+    configured.ingest_key = "packrat_ingest_from_initializer"
+
+    assert_equal CANARY, configured.key
   end
 
   def test_instrumentations_add_and_remove

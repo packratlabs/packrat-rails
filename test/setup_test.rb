@@ -133,7 +133,7 @@ class SetupTest < PackratTest
 
     assert_equal :off, setup.outcome
     assert_kind_of OpenTelemetry::Internal::ProxyTracerProvider, OpenTelemetry.tracer_provider
-    assert_equal "Packrat: PACKRAT_INGEST_KEY is not set, so nothing is sent", setup.line
+    assert_equal "Packrat: no ingest key is set (PACKRAT_INGEST_KEY or config.ingest_key), so nothing is sent", setup.line
   end
 
   def test_test_environment_is_silent

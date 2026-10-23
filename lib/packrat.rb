@@ -21,6 +21,11 @@ module Packrat
       )
     end
 
+    # Packrat.configure { |config| config.ingest_key = "..." }, from config/initializers/packrat.rb.
+    def configure
+      yield config
+    end
+
     # An app adds to what the gem configured with ActiveSupport.on_load(:packrat) { |setup| ... }.
     def start
       @setup = Otel::Setup.new(config:, logger: Rails.logger, errors: Rails.error).call

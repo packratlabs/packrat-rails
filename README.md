@@ -7,10 +7,21 @@ OpenTelemetry for Rails, configured to send traces, logs and exceptions to
 
 ```sh
 bundle add packrat-rails
-# put the line from your Packrat setup screen where the app reads its environment:
-#   PACKRAT_INGEST_KEY=packrat_ingest_…
+bin/rails generate packrat --ingest-key=packrat_ingest_…
 bin/rails server
 ```
+
+The generator creates `config/initializers/packrat.rb` with the ingest key from your Packrat setup
+page:
+
+```ruby
+Packrat.configure do |config|
+  config.ingest_key = ENV.fetch("PACKRAT_INGEST_KEY", "packrat_ingest_…")
+end
+```
+
+An ingest key can only send data, so you can commit the file. To keep the key out of the repository,
+run the generator without `--ingest-key` and set `PACKRAT_INGEST_KEY` where the app runs.
 
 On boot the gem writes one line to the Rails log. It names the service and environment the app
 reports under:
@@ -21,11 +32,12 @@ Packrat: sending traces and logs for shop/production to https://ingest.packrat.s
 
 ## Configuration
 
-All configuration is environment variables. There is no initializer.
+The ingest key is the only setting in `Packrat.configure`. Everything else is an environment
+variable.
 
 | Variable                        | Default                     | Note                                                         |
 | ------------------------------- | --------------------------- | ------------------------------------------------------------ |
-| `PACKRAT_INGEST_KEY`            | none                        | Required. Unset, the gem sends nothing and says so            |
+| `PACKRAT_INGEST_KEY`            | `config.ingest_key`         | Wins over the initializer. With neither, the gem sends nothing and says so |
 | `PACKRAT_INGEST_URL`            | `https://ingest.packrat.sh` | A local Packrat is `http://localhost:3100`                   |
 | `PACKRAT_DISABLED`              | unset                       | `1` turns the gem off in any environment                     |
 | `PACKRAT_OTEL_INSTRUMENTATIONS` | the list below              | Comma-separated names to add; a leading `-` removes one      |

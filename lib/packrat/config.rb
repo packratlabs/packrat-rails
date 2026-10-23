@@ -11,6 +11,7 @@ module Packrat
     REDACTED = "[redacted]".freeze
 
     attr_reader :rails_env, :app_name
+    attr_writer :ingest_key
 
     def initialize(env: ENV, rails_env: nil, app_name: nil)
       @env = env
@@ -18,8 +19,9 @@ module Packrat
       @app_name = app_name
     end
 
+    # The variable wins over the initializer, so a deploy can change the key without a commit.
     def key
-      present(@env["PACKRAT_INGEST_KEY"])
+      present(@env["PACKRAT_INGEST_KEY"]) || present(@ingest_key)
     end
 
     def url
@@ -43,12 +45,17 @@ module Packrat
       if rails_env == "test" then nil
       elsif flag?("PACKRAT_DISABLED") then "PACKRAT_DISABLED is set, so nothing is sent"
       elsif sdk_disabled? then "OTEL_SDK_DISABLED is true, so nothing is sent"
-      elsif key.nil? then "PACKRAT_INGEST_KEY is not set, so nothing is sent"
+      elsif key.nil? then "no ingest key is set (PACKRAT_INGEST_KEY or config.ingest_key), so nothing is sent"
       end
     end
 
     def enabled?
-      rails_env != "test" && !flag?("PACKRAT_DISABLED") && !sdk_disabled? && !key.nil?
+      allowed? && !key.nil?
+    end
+
+    # Everything but the key. The middleware is placed before config/initializers set the key.
+    def allowed?
+      rails_env != "test" && !flag?("PACKRAT_DISABLED") && !sdk_disabled?
     end
 
     # PACKRAT_OTEL_INSTRUMENTATIONS=sidekiq,-pg adds sidekiq to the allowlist and takes pg out.

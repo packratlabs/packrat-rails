@@ -1,0 +1,9 @@
+# Sends your app's exceptions, traces and logs to Packrat: https://packrat.sh/docs/ruby-on-rails
+# PACKRAT_INGEST_KEY, when it is set, wins over the key written here.
+Packrat.configure do |config|
+<% if ingest_key.empty? -%>
+  config.ingest_key = ENV["PACKRAT_INGEST_KEY"]
+<% else -%>
+  config.ingest_key = ENV.fetch("PACKRAT_INGEST_KEY", <%= ingest_key.inspect %>)
+<% end -%>
+end
