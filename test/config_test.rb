@@ -59,6 +59,16 @@ class ConfigTest < PackratTest
     assert config.enabled?
   end
 
+  def test_the_url_from_the_initializer
+    configured = config({ "PACKRAT_INGEST_URL" => "" })
+    configured.ingest_url = "http://localhost:3100/"
+    assert_equal "http://localhost:3100", configured.url
+
+    configured = config
+    configured.ingest_url = "http://localhost:3100"
+    assert_equal URL, configured.url
+  end
+
   def test_the_variable_wins_over_the_initializer
     configured = config
     configured.ingest_key = "packrat_ingest_from_initializer"

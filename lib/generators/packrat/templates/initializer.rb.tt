@@ -6,4 +6,7 @@ Packrat.configure do |config|
 <% else -%>
   config.ingest_key = ENV.fetch("PACKRAT_INGEST_KEY", <%= ingest_key.inspect %>)
 <% end -%>
+<% unless ingest_url.empty? -%>
+  config.ingest_url = <%= ingest_url.inspect %>
+<% end -%>
 end

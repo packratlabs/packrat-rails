@@ -11,6 +11,14 @@ class GeneratorTest < PackratTest
     assert_equal "packrat_ingest_from_env", evaluate(initializer, "packrat_ingest_from_env").key
   end
 
+  def test_an_ingest_url
+    initializer = generate("--ingest-key=#{CANARY}", "--ingest-url=http://localhost:3100")
+
+    assert_includes initializer, %(config.ingest_url = "http://localhost:3100")
+    assert_equal "http://localhost:3100/v1/traces", evaluate(initializer, nil).traces_endpoint
+    refute_includes generate("--ingest-key=#{CANARY}"), "ingest_url"
+  end
+
   def test_without_a_key_reads_the_variable
     initializer = generate
 

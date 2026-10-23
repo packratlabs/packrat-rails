@@ -25,7 +25,7 @@ them for Packrat from environment variables, and adds no instrumentation of its 
 - **Credentials never leave the process.** Both exporters are wrapped by `Otel::Scrubber`, and
   `ErrorSpans` scrubs the message, stack and context, because span events are not scrubbed on export.
 - **An app adds to the gem's setup with `ActiveSupport.on_load(:packrat) { |setup| ... }`**, which
-  runs after the decision. `Packrat.configure` sets the ingest key and nothing else; it is what
+  runs after the decision. `Packrat.configure` sets the ingest key and URL and nothing else; it is what
   `bin/rails generate packrat --ingest-key=…` writes to `config/initializers/packrat.rb`, and
   `PACKRAT_INGEST_KEY` wins over it. The key arrives after the Railtie's initializers run, so the
   middleware is placed on `Config#allowed?`, never `enabled?`.

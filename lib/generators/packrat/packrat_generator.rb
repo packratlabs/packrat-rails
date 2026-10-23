@@ -9,6 +9,7 @@ module Packrat
 
       desc "Creates config/initializers/packrat.rb, which gives the packrat-rails gem your ingest key."
       class_option :ingest_key, type: :string, desc: "The ingest key from your Packrat setup page"
+      class_option :ingest_url, type: :string, desc: "Where to send, when it isn't https://ingest.packrat.sh"
 
       def create_initializer
         template "initializer.rb.tt", "config/initializers/packrat.rb"
@@ -18,6 +19,10 @@ module Packrat
 
       def ingest_key
         options[:ingest_key].to_s.strip
+      end
+
+      def ingest_url
+        options[:ingest_url].to_s.strip
       end
     end
   end

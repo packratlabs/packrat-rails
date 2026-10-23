@@ -11,7 +11,7 @@ module Packrat
     REDACTED = "[redacted]".freeze
 
     attr_reader :rails_env, :app_name
-    attr_writer :ingest_key
+    attr_writer :ingest_key, :ingest_url
 
     def initialize(env: ENV, rails_env: nil, app_name: nil)
       @env = env
@@ -25,7 +25,7 @@ module Packrat
     end
 
     def url
-      (present(@env["PACKRAT_INGEST_URL"]) || DEFAULT_URL).chomp("/")
+      (present(@env["PACKRAT_INGEST_URL"]) || present(@ingest_url) || DEFAULT_URL).chomp("/")
     end
 
     def traces_endpoint

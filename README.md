@@ -32,13 +32,13 @@ Packrat: sending traces and logs for shop/production to https://ingest.packrat.s
 
 ## Configuration
 
-The ingest key is the only setting in `Packrat.configure`. Everything else is an environment
+The ingest key and the ingest URL are the only settings in `Packrat.configure`. Everything else is an environment
 variable.
 
 | Variable                        | Default                     | Note                                                         |
 | ------------------------------- | --------------------------- | ------------------------------------------------------------ |
 | `PACKRAT_INGEST_KEY`            | `config.ingest_key`         | Wins over the initializer. With neither, the gem sends nothing and says so |
-| `PACKRAT_INGEST_URL`            | `https://ingest.packrat.sh` | A local Packrat is `http://localhost:3100`                   |
+| `PACKRAT_INGEST_URL`            | `config.ingest_url`, else `https://ingest.packrat.sh` | A local Packrat is `http://localhost:3100`. `--ingest-url` on the generator writes `config.ingest_url` |
 | `PACKRAT_DISABLED`              | unset                       | `1` turns the gem off in any environment                     |
 | `PACKRAT_OTEL_INSTRUMENTATIONS` | the list below              | Comma-separated names to add; a leading `-` removes one      |
 
