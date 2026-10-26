@@ -1,4 +1,6 @@
 require "test_helper"
+require "fileutils"
+require "json"
 require "tmpdir"
 require "generators/packrat/packrat_generator"
 
@@ -26,6 +28,43 @@ class GeneratorTest < PackratTest
     assert_nil evaluate(initializer, nil).key
   end
 
+  def test_turns_on_the_claude_code_plugin
+    settings = JSON.parse(claude_settings)
+
+    assert_equal({ "source" => { "source" => "github", "repo" => "packratlabs/claude-plugin" } },
+                 settings.dig("extraKnownMarketplaces", "packrat"))
+    assert_equal true, settings.dig("enabledPlugins", "packrat@packrat")
+  end
+
+  def test_keeps_the_rest_of_the_claude_code_settings
+    before = { "permissions" => { "allow" => [ "Bash(bin/rails test:*)" ] },
+               "enabledPlugins" => { "ruby-lsp@claude-plugins-official" => true } }
+    settings = JSON.parse(claude_settings(JSON.generate(before)))
+
+    assert_equal [ "Bash(bin/rails test:*)" ], settings.dig("permissions", "allow")
+    assert_equal true, settings.dig("enabledPlugins", "ruby-lsp@claude-plugins-official")
+    assert_equal true, settings.dig("enabledPlugins", "packrat@packrat")
+  end
+
+  def test_leaves_a_plugin_turned_off_on_purpose
+    settings = JSON.parse(claude_settings(JSON.generate("enabledPlugins" => { "packrat@packrat" => false })))
+
+    assert_equal false, settings.dig("enabledPlugins", "packrat@packrat")
+  end
+
+  def test_running_twice_changes_nothing
+    once = claude_settings
+    assert_equal once, claude_settings(once)
+  end
+
+  def test_leaves_settings_it_cannot_read
+    assert_equal "{ not json", claude_settings("{ not json")
+  end
+
+  def test_no_claude_code_writes_no_settings
+    assert_nil claude_settings(nil, "--no-claude-code")
+  end
+
   def test_rails_finds_it_as_packrat
     assert_equal Packrat::Generators::PackratGenerator, Rails::Generators.find_by_namespace("packrat")
   end
@@ -36,6 +75,19 @@ class GeneratorTest < PackratTest
     Dir.mktmpdir do |root|
       Packrat::Generators::PackratGenerator.start([ *args, "--quiet" ], destination_root: root)
       File.read(File.join(root, "config/initializers/packrat.rb"))
+    end
+  end
+
+  # The .claude/settings.json the generator leaves in a project that had existing (nil for none).
+  def claude_settings(existing = nil, *args)
+    Dir.mktmpdir do |root|
+      path = File.join(root, ".claude/settings.json")
+      if existing
+        FileUtils.mkdir_p(File.dirname(path))
+        File.write(path, existing)
+      end
+      Packrat::Generators::PackratGenerator.start([ *args, "--quiet" ], destination_root: root)
+      File.exist?(path) ? File.read(path) : nil
     end
   end
 
