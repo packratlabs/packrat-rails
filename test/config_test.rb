@@ -18,13 +18,15 @@ class ConfigTest < PackratTest
     assert_equal "shop", config.service_name
     assert_equal "production", config.environment
     assert_equal({ "service.name" => "shop", "deployment.environment.name" => "production", "service.version" => "abc123",
-                   "service.instance.id" => "web.1" }, config.resource_attributes)
+                   "service.instance.id" => "web.1", "telemetry.distro.name" => "packrat-rails",
+                   "telemetry.distro.version" => Packrat::VERSION }, config.resource_attributes)
     assert_equal Socket.gethostname, config({}).resource_attributes["service.instance.id"]
   end
 
   def test_standard_variables_win
     config = config({ "OTEL_SERVICE_NAME" => "storefront", "BUILD_COMMIT" => "abc123",
-                      "OTEL_RESOURCE_ATTRIBUTES" => "deployment.environment=staging,service.version=v9,service.instance.id=a" })
+                      "OTEL_RESOURCE_ATTRIBUTES" => "deployment.environment=staging,service.version=v9,service.instance.id=a," \
+                                                    "telemetry.distro.name=custom,telemetry.distro.version=1" })
 
     assert_equal "storefront", config.service_name
     assert_equal "staging", config.environment
