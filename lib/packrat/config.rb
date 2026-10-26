@@ -9,6 +9,7 @@ module Packrat
     INSTRUMENTATIONS = %w[rack action_pack action_view active_job active_record net_http pg mysql2 sidekiq redis aws_sdk concurrent_ruby rake logger].freeze
     COMMIT_VARIABLES = %w[BUILD_COMMIT HEROKU_SLUG_COMMIT SOURCE_VERSION].freeze
     REDACTED = "[redacted]".freeze
+    DISTRO_ATTRIBUTES = { "telemetry.distro.name" => "packrat-rails", "telemetry.distro.version" => VERSION }.freeze
 
     attr_reader :rails_env, :app_name
     attr_writer :ingest_key, :ingest_url
@@ -89,6 +90,8 @@ module Packrat
         attributes["service.version"] = version if version && !env_attributes.key?("service.version")
         # DYNO names the process on Heroku and build.io: web.1, worker.2.
         attributes["service.instance.id"] = present(@env["DYNO"]) || Socket.gethostname unless env_attributes.key?("service.instance.id")
+        # Packrat reads telemetry.distro.name to tell this gem's data from a hand-built setup.
+        DISTRO_ATTRIBUTES.each { |name, value| attributes[name] = value unless env_attributes.key?(name) }
       end
     end
 

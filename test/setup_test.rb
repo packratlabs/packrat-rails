@@ -15,6 +15,8 @@ class SetupTest < PackratTest
     assert_equal "shop", attributes["service.name"]
     assert_equal "production", attributes["deployment.environment.name"]
     assert_equal "abc123", attributes["service.version"]
+    assert_equal "packrat-rails", attributes["telemetry.distro.name"]
+    assert_equal Packrat::VERSION, attributes["telemetry.distro.version"]
 
     assert_kind_of OpenTelemetry::SDK::Logs::LoggerProvider, OpenTelemetry.logger_provider
     assert_match "RootKindSampler", provider.sampler.description
