@@ -23,6 +23,11 @@ end
 An ingest key can only send data, so you can commit the file. To keep the key out of the repository,
 run the generator without `--ingest-key` and set `PACKRAT_INGEST_KEY` where the app runs.
 
+The generator also turns on the [Packrat plugin for Claude Code](https://packrat.sh/docs/claude-code-plugin)
+in `.claude/settings.json`. Commit the file, and everyone who opens Claude Code in the repository and
+trusts the folder gets the plugin. If the file exists, the generator adds the plugin and keeps the rest.
+To leave the file alone, pass `--no-claude-code`.
+
 On boot the gem writes one line to the Rails log. It names the service and environment the app
 reports under:
 
