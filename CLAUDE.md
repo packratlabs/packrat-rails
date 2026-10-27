@@ -21,7 +21,8 @@ them for Packrat from environment variables, and adds no instrumentation of its 
   `config/initializers`, and an app that adds middleware in an initializer fails to boot.
 - **The Rack span is `Packrat::RackSpan`**, put in the stack early because the stack is frozen by
   the time the decision is made. For the same reason the Action Pack instrumentation's Railtie is
-  marked as loaded and never runs.
+  marked as loaded and never runs. So is Action View's: its `config.after_initialize` block, loaded
+  during the decision, runs twice, and `Otel::Setup#subscribe_action_view` subscribes once instead.
 - **Credentials never leave the process.** Both exporters are wrapped by `Otel::Scrubber`, and
   `ErrorSpans` scrubs the message, stack and context, because span events are not scrubbed on export.
 - **An app adds to the gem's setup with `ActiveSupport.on_load(:packrat) { |setup| ... }`**, which
@@ -36,7 +37,7 @@ them for Packrat from environment variables, and adds no instrumentation of its 
 
 ## Checks
 
-- `make check`: rubocop and the unit tests. No Rails app is booted.
+- `make check`: rubocop and the unit tests. `test/boot_test.rb` boots one Rails app in a child process; the rest boot none.
 - `corpus/generate.sh 8.1` then `bundle exec ruby corpus/boot.rb corpus/generated/rails-8.1`: a
   generated app booted against a listener, with every request decoded and checked.
 - `bundle exec ruby corpus/boot.rb <worktree> --existing [--expect=appended] [--ruby=ruby-3.1.6] [NAME=value]`:

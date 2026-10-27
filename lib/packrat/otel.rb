@@ -19,6 +19,7 @@ module Packrat
     # These set up in an after_initialize block of their own Railtie, which cannot run once boot has
     # reached Packrat's.
     BOOT_ONLY = %w[action_mailer active_storage].freeze
+    ACTION_VIEW_EVENTS = %w[render_template render_partial render_collection render_layout].map { |event| "#{event}.action_view" }.freeze
     EXIT_TIMEOUT = 5
 
     # dogstatsd-ruby defines Datadog::Statsd without the tracer, hence the method check.
@@ -173,8 +174,10 @@ module Packrat
 
         require "opentelemetry-instrumentation-#{PREREQUISITES[name]}" if PREREQUISITES[name]
         require "opentelemetry-instrumentation-#{name}"
-        skip_action_pack_railtie if name == "action_pack"
+        skip_railtie(name) if %w[action_pack action_view].include?(name)
         return unless instrumentation(name).install(OPTIONS.fetch(name, {}))
+
+        subscribe_action_view if name == "action_view"
 
         prerequisite = PREREQUISITES[name]
         @installed << prerequisite if prerequisite && !@installed.include?(prerequisite) && instrumentation(prerequisite).installed?
@@ -183,11 +186,28 @@ module Packrat
 
       # Action Pack's install loads a Railtie whose one job is to put the Rack span in the middleware
       # stack. At the end of boot the stack is frozen, so loading it raises; Packrat::RackSpan does
-      # that job, and the file is marked as loaded instead.
-      def skip_action_pack_railtie
-        _, path = $LOAD_PATH.resolve_feature_path("opentelemetry/instrumentation/action_pack/railtie")
+      # that job, and the file is marked as loaded instead. Action View's is skipped too: see
+      # subscribe_action_view.
+      def skip_railtie(name)
+        _, path = $LOAD_PATH.resolve_feature_path("opentelemetry/instrumentation/#{name}/railtie")
         path = File.realpath(path)
         $LOADED_FEATURES << path unless $LOADED_FEATURES.include?(path)
+      end
+
+      # Action View's Railtie subscribes in config.after_initialize. Loaded while Packrat's own
+      # after_initialize block runs, that block runs at once and again when Rails reaches it in the
+      # list it is walking. Two subscribers share one payload key, so every render left a context
+      # attached and each later request on the thread became a child of the last.
+      def subscribe_action_view
+        instrumentation("active_support").install({})
+        action_view = instrumentation("action_view")
+        formatter = OpenTelemetry::Instrumentation::ActiveSupport::LEGACY_NAME_FORMATTER if action_view.config[:legacy_span_names]
+        ACTION_VIEW_EVENTS.each do |event|
+          OpenTelemetry::Instrumentation::ActiveSupport.subscribe(
+            action_view.tracer, event, action_view.config[:notification_payload_transform],
+            action_view.config[:disallowed_notification_payload_keys], span_name_formatter: formatter
+          )
+        end
       end
 
       def instrumentation(name)

@@ -66,7 +66,9 @@ class PackratTest < Minitest::Test
     setup = Packrat::Otel::Setup.new(config:, logger: @logger, errors: @errors)
     @instrumentations = instrumentations
     setup.stub(:instrumentation, ->(name) { instrumentations[name] }) do
-      setup.stub(:at_exit, nil) { yield setup if block_given?; setup.call }
+      setup.stub(:subscribe_action_view, nil) do
+        setup.stub(:at_exit, nil) { yield setup if block_given?; setup.call }
+      end
     end
   end
 
