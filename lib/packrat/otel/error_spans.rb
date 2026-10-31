@@ -14,11 +14,19 @@ module Packrat
       # A cache failure falls back to the source of truth; Sentry skips these too.
       CACHE_STORE_SOURCE = /_cache_store\.active_support\z/
 
+      def initialize(scrubber = Scrubber.new)
+        @scrubber = scrubber
+      end
+
+      # Scrubbed here as well as on export: with an app's own OpenTelemetry, its exporter receives
+      # these events too.
       def report(error, handled:, severity:, context:, source: nil)
         return if skipped?(handled, source)
 
         exception = error.is_a?(Exception) ? error : RuntimeError.new(error.to_s)
-        attributes = exception_attributes(exception, handled, severity, source).merge(context_attributes(context))
+        attributes = @scrubber.scrub_event_attributes(
+          exception_attributes(exception, handled, severity, source).merge(context_attributes(context))
+        )
         span = OpenTelemetry::Trace.current_span
         return span.record_exception(exception, attributes:) if span.recording?
 
@@ -35,11 +43,10 @@ module Packrat
         (!handled && INSTRUMENTED_SOURCES.include?(source)) || CACHE_STORE_SOURCE.match?(source.to_s)
       end
 
-      # Span events are not scrubbed on export, so the message and the stack are scrubbed here.
       def exception_attributes(exception, handled, severity, source)
         {
-          "exception.message" => scrub(exception.message),
-          "exception.stacktrace" => scrub(exception.full_message(highlight: false, order: :top)),
+          "exception.message" => utf8(exception.message),
+          "exception.stacktrace" => utf8(exception.full_message(highlight: false, order: :top)),
           "exception.handled" => handled,
           "rails.error.severity" => severity.to_s,
           "rails.error.source" => source
@@ -58,13 +65,14 @@ module Packrat
       def attribute_value(value)
         case value
         when Integer, Float, true, false then value
-        when Hash, Array then scrub(value.to_json)
-        else scrub(value.to_s)
+        when Hash then utf8(@scrubber.filter_hash(value).to_json)
+        when Array then utf8(value.to_json)
+        else utf8(value.to_s)
         end
       end
 
-      def scrub(text)
-        Scrubber.scrub_text(text.to_s.encode("UTF-8", invalid: :replace, undef: :replace, replace: "�"))
+      def utf8(text)
+        text.to_s.encode("UTF-8", invalid: :replace, undef: :replace, replace: "�")
       end
     end
   end

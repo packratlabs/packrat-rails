@@ -32,10 +32,11 @@ module Packrat
     class Setup
       attr_reader :outcome, :line, :installed, :warnings
 
-      def initialize(config:, logger:, errors:)
+      def initialize(config:, logger:, errors:, filters: [])
         @config = config
         @logger = logger
         @errors = errors
+        @filters = filters
         @installed = []
         @warnings = []
       end
@@ -83,10 +84,10 @@ module Packrat
         @outcome = :configured
         step("sampler") { use_sampler } unless @config.set?("OTEL_TRACES_SAMPLER")
         @config.instrumentations.each { |name| step("instrumentation #{name}") { install(name) } }
-        step("Rails.error") { @errors.subscribe(ErrorSpans.new) }
+        step("Rails.error") { @errors.subscribe(ErrorSpans.new(scrubber)) }
         step("at_exit") { at_exit { shutdown_providers } }
         @line = "Packrat: sending #{signals(records)} for #{@config.service_name}/#{@config.environment} " \
-                "to #{@config.url} (#{@installed.join(', ')})"
+                "to #{@config.url} (#{@installed.join(', ')}); #{privacy}"
       end
 
       def append(provider)
@@ -101,13 +102,13 @@ module Packrat
         @outcome = :appended
         records = sdk_logger_provider && logger_instrumented? && step("logs exporter") { log_record_processor }
         records = nil unless records && step("logs processor") { sdk_logger_provider.add_log_record_processor(records) }
-        errors = !error_spans? && step("Rails.error") { @errors.subscribe(ErrorSpans.new) }
+        errors = !error_spans? && step("Rails.error") { @errors.subscribe(ErrorSpans.new(scrubber)) }
         step("at_exit") { at_exit { [ spans, records ].compact.each { |processor| processor.shutdown(timeout: EXIT_TIMEOUT) } } }
 
         attributes = provider.resource.attribute_enumerator.to_h
         name = attributes["service.name"]
         environment = attributes["deployment.environment.name"] || attributes["deployment.environment"]
-        @line = "Packrat: sending a copy of the app's #{signals(records)} for #{name}/#{environment} to #{@config.url}"
+        @line = "Packrat: sending a copy of the app's #{signals(records)} for #{name}/#{environment} to #{@config.url}; #{privacy}"
         @line += "; Rails.error is now recorded on spans, which the app's own exporter also receives" if errors
         if name.nil? || name.start_with?("unknown_service")
           @line += ". Warning: the app's OpenTelemetry resource has no service.name, and the setup screen looks for the app by name"
@@ -140,13 +141,13 @@ module Packrat
 
       def span_processor
         OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(
-          ScrubbingSpanExporter.new(OpenTelemetry::Exporter::OTLP::Exporter.new(endpoint: @config.traces_endpoint, headers: @config.headers))
+          ScrubbingSpanExporter.new(OpenTelemetry::Exporter::OTLP::Exporter.new(endpoint: @config.traces_endpoint, headers: @config.headers), scrubber)
         )
       end
 
       def log_record_processor
         OpenTelemetry::SDK::Logs::Export::BatchLogRecordProcessor.new(
-          ScrubbingLogExporter.new(OpenTelemetry::Exporter::OTLP::Logs::LogsExporter.new(endpoint: @config.logs_endpoint, headers: @config.headers))
+          ScrubbingLogExporter.new(OpenTelemetry::Exporter::OTLP::Logs::LogsExporter.new(endpoint: @config.logs_endpoint, headers: @config.headers), scrubber)
         )
       rescue NameError => error
         raise unless error.name == :Utilities
@@ -240,6 +241,16 @@ module Packrat
       # ActiveSupport::ErrorReporter keeps its subscribers private.
       def error_spans?
         Array(@errors.instance_variable_get(:@subscribers)).any? { |subscriber| subscriber.class.name.to_s.end_with?("ErrorSpans") }
+      end
+
+      def scrubber
+        @scrubber ||= Scrubber.new(key: @config.key, filters: @filters, redact: @config.redactions, strict: @config.strict?)
+      end
+
+      # The boot line says what is held back, so whoever reads the log knows without opening the README.
+      def privacy
+        redacted = @config.redactions.empty? ? "no personal data patterns" : @config.redactions.join(" and ")
+        @config.strict? ? "strict privacy, redacting #{redacted}" : "redacting #{redacted}"
       end
 
       def signals(records)

@@ -6,6 +6,13 @@ Packrat.configure do |config|
 <% else -%>
   config.ingest_key = ENV.fetch("PACKRAT_INGEST_KEY", <%= ingest_key.inspect %>)
 <% end -%>
+<% if strict? -%>
+  # Strict sends no log text, query strings or exception messages: https://packrat.sh/docs/ruby-on-rails#privacy
+  config.privacy = :strict
+<% else -%>
+  # :strict sends no log text, query strings or exception messages: https://packrat.sh/docs/ruby-on-rails#privacy
+  # config.privacy = :strict
+<% end -%>
 <% unless ingest_url.empty? -%>
   config.ingest_url = <%= ingest_url.inspect %>
 <% end -%>
