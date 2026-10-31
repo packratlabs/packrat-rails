@@ -85,6 +85,34 @@ class ConfigTest < PackratTest
                  config.instrumentations
   end
 
+  def test_privacy_is_standard_until_strict_is_asked_for
+    assert_equal "standard", config.privacy
+    refute config.strict?
+    assert_predicate config({ "PACKRAT_PRIVACY" => "strict" }), :strict?
+
+    from_initializer = config
+    from_initializer.privacy = :strict
+    assert_predicate from_initializer, :strict?
+  end
+
+  def test_the_privacy_variable_wins_over_the_initializer
+    loose = config({ "PACKRAT_PRIVACY" => "standard" })
+    loose.privacy = :strict
+
+    refute loose.strict?
+  end
+
+  def test_a_misspelled_privacy_is_strict
+    assert_predicate config({ "PACKRAT_PRIVACY" => "strcit" }), :strict?
+  end
+
+  def test_redactions_can_be_turned_off_one_at_a_time
+    assert_equal %w[email ip], config.redactions
+    assert_equal %w[email], config({ "PACKRAT_REDACT" => "-ip" }).redactions
+    assert_empty config({ "PACKRAT_REDACT" => "-ip,-email" }).redactions
+    assert_equal %w[email ip], config({ "PACKRAT_REDACT" => "credit_card" }).redactions
+  end
+
   def test_app_exports_to_packrat
     assert config({ "PACKRAT_INGEST_URL" => "", "OTEL_EXPORTER_OTLP_ENDPOINT" => "https://ingest.packrat.sh" }).app_exports_to_packrat?
     assert config({ "PACKRAT_INGEST_URL" => "", "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT" => "https://ingest.packrat.sh/v1/traces" }).app_exports_to_packrat?

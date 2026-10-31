@@ -12,6 +12,8 @@ module Packrat
            "and turns on the Packrat plugin for Claude Code in .claude/settings.json."
       class_option :ingest_key, type: :string, desc: "The ingest key from your Packrat setup page"
       class_option :ingest_url, type: :string, desc: "Where to send, when it isn't https://ingest.packrat.sh"
+      class_option :strict, type: :boolean, default: false,
+                            desc: "Send no log text, query strings or exception messages"
       class_option :claude_code, type: :boolean, default: true,
                                  desc: "Turn on the Packrat plugin for Claude Code in .claude/settings.json"
 
@@ -49,6 +51,10 @@ module Packrat
 
       def ingest_url
         options[:ingest_url].to_s.strip
+      end
+
+      def strict?
+        options[:strict]
       end
 
       def settings_json(settings)

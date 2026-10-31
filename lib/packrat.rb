@@ -28,7 +28,9 @@ module Packrat
 
     # An app adds to what the gem configured with ActiveSupport.on_load(:packrat) { |setup| ... }.
     def start
-      @setup = Otel::Setup.new(config:, logger: Rails.logger, errors: Rails.error).call
+      @setup = Otel::Setup.new(
+        config:, logger: Rails.logger, errors: Rails.error, filters: Rails.application.config.filter_parameters
+      ).call
       ActiveSupport.run_load_hooks(:packrat, @setup)
     end
 

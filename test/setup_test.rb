@@ -25,7 +25,7 @@ class SetupTest < PackratTest
     assert_equal({ untraced_endpoints: [ "/up" ] }, @instrumentations["rack"].config)
     assert_kind_of Packrat::Otel::ErrorSpans, @errors.subscribers.sole
     assert_equal "Packrat: sending traces and logs for shop/production to #{URL} " \
-                 "(#{installed.join(', ')})", setup.line
+                 "(#{installed.join(', ')}); redacting email and ip", setup.line
     assert_includes log, setup.line
   end
 
@@ -58,7 +58,7 @@ class SetupTest < PackratTest
     assert_equal "#{URL}/v1/traces", exporters(provider).last.instance_variable_get(:@uri).to_s
     assert_empty setup.installed
     assert_equal "Packrat: sending a copy of the app's traces for shop/production to #{URL}; " \
-                 "Rails.error is now recorded on spans, which the app's own exporter also receives", setup.line
+                 "redacting email and ip; Rails.error is now recorded on spans, which the app's own exporter also receives", setup.line
   end
 
   def test_append_adds_logs_when_the_apps_log_lines_reach_its_logger_provider

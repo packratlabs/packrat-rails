@@ -182,7 +182,7 @@ class Boot
     puts "footprint: middleware #{middleware}, instrumentation #{instrumentation}, Rails.error #{subscribers}"
     check("footprint middleware is Packrat::RackSpan alone") { middleware == [ "Packrat::RackSpan" ] }
     check("off adds no middleware") { !off["middleware"].include?("Packrat::RackSpan") }
-    named = on["line"].to_s[/\(([^)]*)\)\z/, 1].to_s.split(", ")
+    named = on["line"].to_s[/\(([^)]*)\)(?:;|\z)/, 1].to_s.split(", ")
     check("every instrumentation installed is named in the boot line") do
       instrumentation.all? { |name| named.any? { |short| name.downcase.delete(":_").end_with?(short.delete("_")) } }
     end

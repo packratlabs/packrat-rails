@@ -8,11 +8,13 @@ module Packrat
     DEFAULT_URL = "https://ingest.packrat.sh".freeze
     INSTRUMENTATIONS = %w[rack action_pack action_view active_job active_record net_http pg mysql2 sidekiq redis aws_sdk concurrent_ruby rake logger].freeze
     COMMIT_VARIABLES = %w[BUILD_COMMIT HEROKU_SLUG_COMMIT SOURCE_VERSION].freeze
+    REDACTIONS = %w[email ip].freeze
+    PRIVACY = %w[standard strict].freeze
     REDACTED = "[redacted]".freeze
     DISTRO_ATTRIBUTES = { "telemetry.distro.name" => "packrat-rails", "telemetry.distro.version" => VERSION }.freeze
 
     attr_reader :rails_env, :app_name
-    attr_writer :ingest_key, :ingest_url
+    attr_writer :ingest_key, :ingest_url, :privacy
 
     def initialize(env: ENV, rails_env: nil, app_name: nil)
       @env = env
@@ -61,10 +63,22 @@ module Packrat
 
     # PACKRAT_OTEL_INSTRUMENTATIONS=sidekiq,-pg adds sidekiq to the allowlist and takes pg out.
     def instrumentations
-      @env["PACKRAT_OTEL_INSTRUMENTATIONS"].to_s.split(",").map(&:strip).reject(&:empty?)
-        .reduce(INSTRUMENTATIONS.dup) do |names, entry|
-          entry.start_with?("-") ? names - [ entry.delete_prefix("-") ] : names | [ entry ]
-        end
+      adjusted(INSTRUMENTATIONS, "PACKRAT_OTEL_INSTRUMENTATIONS")
+    end
+
+    # PACKRAT_REDACT=-ip stops masking IP addresses.
+    def redactions
+      adjusted(REDACTIONS, "PACKRAT_REDACT") & REDACTIONS
+    end
+
+    # A value that is neither name is strict: a misspelling should not send more than was meant.
+    def privacy
+      value = (present(@env["PACKRAT_PRIVACY"]) || present(@privacy) || "standard").downcase
+      PRIVACY.include?(value) ? value : "strict"
+    end
+
+    def strict?
+      privacy == "strict"
     end
 
     def service_name
@@ -108,7 +122,7 @@ module Packrat
     end
 
     def inspect
-      "#<#{self.class.name} url=#{url} key=#{key ? REDACTED : 'unset'} service=#{service_name} environment=#{environment}>"
+      "#<#{self.class.name} url=#{url} key=#{key ? REDACTED : 'unset'} service=#{service_name} environment=#{environment} privacy=#{privacy}>"
     end
     alias to_s inspect
 
@@ -120,6 +134,12 @@ module Packrat
         name, value = pair.split("=", 2).map { |part| part.to_s.strip }
         [ name, value ] unless name.empty? || value.empty?
       end.to_h
+    end
+
+    def adjusted(defaults, name)
+      @env[name].to_s.split(",").map(&:strip).reject(&:empty?).reduce(defaults.dup) do |names, entry|
+        entry.start_with?("-") ? names - [ entry.delete_prefix("-") ] : names | [ entry ]
+      end
     end
 
     def sdk_disabled?

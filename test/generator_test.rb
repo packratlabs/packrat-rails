@@ -28,6 +28,20 @@ class GeneratorTest < PackratTest
     assert_nil evaluate(initializer, nil).key
   end
 
+  def test_strict
+    initializer = generate("--ingest-key=#{CANARY}", "--strict")
+
+    assert_includes initializer, "\n  config.privacy = :strict"
+    assert evaluate(initializer, nil).strict?
+  end
+
+  def test_standard_privacy_names_strict_in_a_comment
+    initializer = generate("--ingest-key=#{CANARY}")
+
+    assert_includes initializer, "# config.privacy = :strict"
+    refute evaluate(initializer, nil).strict?
+  end
+
   def test_turns_on_the_claude_code_plugin
     settings = JSON.parse(claude_settings)
 
