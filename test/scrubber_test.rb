@@ -278,6 +278,100 @@ class ScrubberTest < PackratTest
     assert_equal({ "password" => "[REDACTED]", "page" => "2" }, JSON.parse(context))
   end
 
+  def test_a_key_the_app_names_redacts_the_attribute_the_parameter_and_the_context
+    scrubber = Scrubber.new(keys: %w[ssn])
+    scrubbed = scrubber.scrub_attributes(
+      "ssn" => "123-45-6789", "enduser.ssn" => "123-45-6789", "http.target" => "/p?ssn=123-45-6789&ssn_last=6789",
+      "rails.error.context.ssn" => "123-45-6789", "lessn" => "kept"
+    )
+
+    assert_equal "[REDACTED]", scrubbed["ssn"]
+    assert_equal "[REDACTED]", scrubbed["enduser.ssn"]
+    assert_equal "/p?ssn=[REDACTED]&ssn_last=6789", scrubbed["http.target"]
+    assert_equal "[REDACTED]", scrubbed["rails.error.context.ssn"]
+    assert_equal "kept", scrubbed["lessn"]
+    assert_equal({ "ssn" => "[REDACTED]", "page" => 2 }, scrubber.filter_hash("ssn" => "1", "page" => 2))
+  end
+
+  def test_a_pattern_the_app_names_is_redacted_from_attributes_and_text
+    scrubber = Scrubber.new(patterns: [ /acct \d{4}-\d{2}/ ])
+
+    assert_equal "Refund to [REDACTED] done", scrubber.scrub_text("Refund to acct 4410-22 done")
+    assert_equal "[REDACTED]", scrubber.scrub_attributes("note" => "acct 4410-22")["note"]
+    assert_equal "/r?x=[REDACTED]", scrubber.scrub_attributes("http.target" => "/r?x=acct 4410-22")["http.target"]
+  end
+
+  def test_the_apps_block_sees_every_string_and_its_name
+    seen = []
+    scrubber = Scrubber.new(redactor: ->(value, name) { seen << name; value.gsub("Jane Smith", "[name]") })
+
+    scrubbed = scrubber.scrub_attributes("note" => "for Jane Smith", "count" => 3, "tags" => [ "Jane Smith" ])
+
+    assert_equal "for [name]", scrubbed["note"]
+    assert_equal [ "[name]" ], scrubbed["tags"]
+    assert_equal 3, scrubbed["count"]
+    assert_equal %w[note tags], seen
+  end
+
+  def test_the_apps_block_runs_on_log_lines_after_the_gems_own_redaction
+    recording = RecordingExporter.new
+    scrubber = Scrubber.new(redactor: ->(value, name) { "#{name.inspect}:#{value.sub('Jane Smith', '[name]')}" })
+    exporter = Packrat::Otel::ScrubbingLogExporter.new(recording, scrubber)
+    provider = OpenTelemetry::SDK::Logs::LoggerProvider.new
+    provider.add_log_record_processor(OpenTelemetry::SDK::Logs::Export::SimpleLogRecordProcessor.new(exporter))
+
+    provider.logger(name: "test").on_emit(body: "Refund for Jane Smith, token=abc")
+
+    assert_equal "nil:Refund for [name], token=[REDACTED]", recording.batches.flatten.first.body
+  end
+
+  def test_a_block_that_raises_or_returns_no_string_sends_nothing_of_the_value
+    raising = Scrubber.new(redactor: ->(_value, _name) { raise "bug in the app" })
+    silent = Scrubber.new(redactor: ->(_value, _name) { })
+
+    assert_equal "[REDACTED]", raising.scrub_attributes("note" => "for Jane Smith")["note"]
+    assert_equal "[REDACTED]", silent.scrub_attributes("note" => "for Jane Smith")["note"]
+  end
+
+  def test_debug_export_prints_each_item_as_scrubbed
+    io = StringIO.new
+    recording = RecordingExporter.new
+    provider = OpenTelemetry::SDK::Trace::TracerProvider.new
+    provider.add_span_processor(OpenTelemetry::SDK::Trace::Export::SimpleSpanProcessor.new(
+      Packrat::Otel::ScrubbingSpanExporter.new(recording, Scrubber.new, io:)
+    ))
+
+    provider.tracer("test").in_span("GET /users", attributes: { "http.target" => "/users?token=abc&page=2" }) { nil }
+
+    line = io.string
+    assert line.start_with?("Packrat export: ")
+    printed = JSON.parse(line.delete_prefix("Packrat export: "))
+    assert_equal "GET /users", printed["span"]
+    assert_equal "/users?token=[REDACTED]&page=2", printed["attributes"]["http.target"]
+    assert_equal recording.batches.flatten.first.attributes, printed["attributes"]
+  end
+
+  def test_debug_export_prints_log_records
+    io = StringIO.new
+    exporter = Packrat::Otel::ScrubbingLogExporter.new(RecordingExporter.new, Scrubber.new, io:)
+    provider = OpenTelemetry::SDK::Logs::LoggerProvider.new
+    provider.add_log_record_processor(OpenTelemetry::SDK::Logs::Export::SimpleLogRecordProcessor.new(exporter))
+
+    provider.logger(name: "test").on_emit(body: "sent to jane@example.com", severity_text: "INFO")
+
+    printed = JSON.parse(io.string.delete_prefix("Packrat export: "))
+    assert_match(/\Asent to \[email:\h{8}\]\z/, printed["log"])
+    assert_equal "INFO", printed["severity"]
+  end
+
+  def test_without_an_io_nothing_is_printed
+    out, = capture_io do
+      Packrat::Otel::ScrubbingSpanExporter.new(RecordingExporter.new).export([])
+    end
+
+    assert_empty out
+  end
+
   def test_flush_and_shutdown_reach_the_exporter_behind
     recording = RecordingExporter.new
     exporter = Packrat::Otel::ScrubbingLogExporter.new(recording)

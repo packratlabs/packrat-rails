@@ -106,6 +106,30 @@ class ConfigTest < PackratTest
     assert_predicate config({ "PACKRAT_PRIVACY" => "strcit" }), :strict?
   end
 
+  def test_the_apps_own_redaction
+    own = config
+    own.redact_keys = [ :ssn, " ", "account_number" ]
+    own.redact_patterns = [ /acct \d+/, "ORD-1.2", "" ]
+    own.redact { |value, _name| value }
+
+    assert_equal %w[ssn account_number], own.redact_keys
+    assert_equal [ /acct \d+/, /ORD\-1\.2/ ], own.redact_patterns
+    assert_kind_of Proc, own.redactor
+  end
+
+  def test_debug_export_from_the_initializer_or_the_variable
+    refute config.debug_export?
+    assert_predicate config({ "PACKRAT_DEBUG_EXPORT" => "1" }), :debug_export?
+
+    from_initializer = config
+    from_initializer.debug_export = true
+    assert_predicate from_initializer, :debug_export?
+
+    silenced = config({ "PACKRAT_DEBUG_EXPORT" => "0" })
+    silenced.debug_export = true
+    refute silenced.debug_export?
+  end
+
   def test_redactions_can_be_turned_off_one_at_a_time
     assert_equal %w[email ip], config.redactions
     assert_equal %w[email], config({ "PACKRAT_REDACT" => "-ip" }).redactions

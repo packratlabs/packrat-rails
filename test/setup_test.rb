@@ -29,6 +29,15 @@ class SetupTest < PackratTest
     assert_includes log, setup.line
   end
 
+  def test_the_boot_line_names_the_apps_own_redaction_and_debug_export
+    config = config({ "PACKRAT_DEBUG_EXPORT" => "1" })
+    config.redact_keys = %w[ssn]
+    config.redact { |value, _name| value }
+    setup = run_setup(config)
+
+    assert_match(/; redacting email and ip and the app's own keys, block; printing every export to stdout \(PACKRAT_DEBUG_EXPORT\)\z/, setup.line)
+  end
+
   def test_configure_lists_only_what_installed
     instrumentations = Hash.new { |hash, name| hash[name] = FakeInstrumentation.new(present: %w[rack action_pack active_job active_record net_http logger].include?(name)) }
     setup = run_setup(config, instrumentations:)

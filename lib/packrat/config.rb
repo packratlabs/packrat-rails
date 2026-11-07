@@ -13,8 +13,8 @@ module Packrat
     REDACTED = "[redacted]".freeze
     DISTRO_ATTRIBUTES = { "telemetry.distro.name" => "packrat-rails", "telemetry.distro.version" => VERSION }.freeze
 
-    attr_reader :rails_env, :app_name
-    attr_writer :ingest_key, :ingest_url, :privacy
+    attr_reader :rails_env, :app_name, :redactor
+    attr_writer :ingest_key, :ingest_url, :privacy, :redact_keys, :redact_patterns, :debug_export
 
     def initialize(env: ENV, rails_env: nil, app_name: nil)
       @env = env
@@ -79,6 +79,29 @@ module Packrat
 
     def strict?
       privacy == "strict"
+    end
+
+    # Attribute and parameter names whose whole value is redacted: config.redact_keys = %w[ssn account_number].
+    def redact_keys
+      Array(@redact_keys).map { |name| name.to_s.strip }.reject(&:empty?).uniq
+    end
+
+    # A string is matched literally, so a pattern written without regex syntax redacts what it says.
+    def redact_patterns
+      Array(@redact_patterns).filter_map do |pattern|
+        pattern.is_a?(Regexp) ? pattern : (Regexp.new(Regexp.escape(pattern.to_s)) unless pattern.to_s.empty?)
+      end
+    end
+
+    # config.redact { |value, name| value.gsub(NAME, "[name]") } runs on every string after the gem's own
+    # redaction; name is the attribute's, or nil for a log line.
+    def redact(&block)
+      @redactor = block
+    end
+
+    # The variable wins over the initializer, so PACKRAT_DEBUG_EXPORT=0 silences a committed setting.
+    def debug_export?
+      set?("PACKRAT_DEBUG_EXPORT") ? flag?("PACKRAT_DEBUG_EXPORT") : !!@debug_export
     end
 
     def service_name

@@ -25,13 +25,16 @@ them for Packrat from environment variables, and adds no instrumentation of its 
   during the decision, runs twice, and `Otel::Setup#subscribe_action_view` subscribes once instead.
 - **Credentials and personal data never leave the process.** Both exporters are wrapped by an
   `Otel::Scrubber` that `Setup` builds from the ingest key, `filter_parameters`, `PACKRAT_REDACT` and the
-  privacy level; it scrubs attributes, span events and log bodies. `ErrorSpans` scrubs with the same
+  privacy level, and the app's own redaction after it; a `redact` block that raises or returns no string
+  sends `[REDACTED]`. It scrubs attributes, span events and log bodies. `PACKRAT_DEBUG_EXPORT` prints
+  each item as scrubbed to `$stdout`, never through a `Logger`, which the logger instrumentation would export. `ErrorSpans` scrubs with the same
   instance, because with an app's own OpenTelemetry its exporter receives those events too. The
   scrubber holds the ingest key (the email HMAC), so its `inspect` must not print it.
 - **`strict` must still answer a deploy check:** routes, durations, statuses, exception classes and
   frames, query shapes. A change that drops one of those from strict is a regression.
 - **An app adds to the gem's setup with `ActiveSupport.on_load(:packrat) { |setup| ... }`**, which
-  runs after the decision. `Packrat.configure` sets the ingest key, the URL and the privacy level and nothing else; it is what
+  runs after the decision. `Packrat.configure` sets the ingest key, the URL, the privacy level, the app's own redaction
+  (`redact_keys`, `redact_patterns`, a `redact` block) and `debug_export`, and nothing else; it is what
   `bin/rails generate packrat --ingest-key=…` writes to `config/initializers/packrat.rb`, and
   `PACKRAT_INGEST_KEY` wins over it. The key arrives after the Railtie's initializers run, so the
   middleware is placed on `Config#allowed?`, never `enabled?`.

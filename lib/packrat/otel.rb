@@ -141,13 +141,13 @@ module Packrat
 
       def span_processor
         OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(
-          ScrubbingSpanExporter.new(OpenTelemetry::Exporter::OTLP::Exporter.new(endpoint: @config.traces_endpoint, headers: @config.headers), scrubber)
+          ScrubbingSpanExporter.new(OpenTelemetry::Exporter::OTLP::Exporter.new(endpoint: @config.traces_endpoint, headers: @config.headers), scrubber, io: debug_io)
         )
       end
 
       def log_record_processor
         OpenTelemetry::SDK::Logs::Export::BatchLogRecordProcessor.new(
-          ScrubbingLogExporter.new(OpenTelemetry::Exporter::OTLP::Logs::LogsExporter.new(endpoint: @config.logs_endpoint, headers: @config.headers), scrubber)
+          ScrubbingLogExporter.new(OpenTelemetry::Exporter::OTLP::Logs::LogsExporter.new(endpoint: @config.logs_endpoint, headers: @config.headers), scrubber, io: debug_io)
         )
       rescue NameError => error
         raise unless error.name == :Utilities
@@ -244,13 +244,24 @@ module Packrat
       end
 
       def scrubber
-        @scrubber ||= Scrubber.new(key: @config.key, filters: @filters, redact: @config.redactions, strict: @config.strict?)
+        @scrubber ||= Scrubber.new(
+          key: @config.key, filters: @filters, redact: @config.redactions, strict: @config.strict?,
+          keys: @config.redact_keys, patterns: @config.redact_patterns, redactor: @config.redactor
+        )
+      end
+
+      def debug_io
+        $stdout if @config.debug_export?
       end
 
       # The boot line says what is held back, so whoever reads the log knows without opening the README.
       def privacy
         redacted = @config.redactions.empty? ? "no personal data patterns" : @config.redactions.join(" and ")
-        @config.strict? ? "strict privacy, redacting #{redacted}" : "redacting #{redacted}"
+        own = { "keys" => @config.redact_keys, "patterns" => @config.redact_patterns, "block" => @config.redactor }
+              .filter_map { |name, value| (value.respond_to?(:empty?) ? !value.empty? : value) && name }
+        redacted += " and the app's own #{own.join(', ')}" unless own.empty?
+        line = @config.strict? ? "strict privacy, redacting #{redacted}" : "redacting #{redacted}"
+        @config.debug_export? ? "#{line}; printing every export to stdout (PACKRAT_DEBUG_EXPORT)" : line
       end
 
       def signals(records)
