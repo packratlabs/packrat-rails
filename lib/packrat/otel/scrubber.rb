@@ -1,5 +1,6 @@
 require "cgi"
 require "ipaddr"
+require "json"
 require "openssl"
 require "active_support/parameter_filter"
 
@@ -37,9 +38,15 @@ module Packrat
       IPV4 = /(?<![\d.])(#{OCTET}\.#{OCTET}\.#{OCTET})\.#{OCTET}(?!\.?\d)/
       IPV6 = /(?<![\w:])(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}(?![\w:])/i
 
-      def initialize(key: nil, filters: [], redact: Config::REDACTIONS, strict: false)
+      # keys, patterns and redactor are the app's own (config.redact_keys, redact_patterns, redact).
+      def initialize(key: nil, filters: [], redact: Config::REDACTIONS, strict: false, keys: [], patterns: [], redactor: nil)
         @key = key.to_s
+        # A filter_parameters string matches any name that contains it; a key the app names matches whole.
+        filters = filters + keys.map { |name| /\A#{Regexp.escape(name)}\z/i }
         @filter = ActiveSupport::ParameterFilter.new(filters, mask: REDACTED) unless filters.empty?
+        @keys = keys.map(&:downcase)
+        @patterns = patterns
+        @redactor = redactor
         @email = redact.include?("email")
         @ip = redact.include?("ip")
         @strict = strict
@@ -47,7 +54,8 @@ module Packrat
 
       # The ingest key is the HMAC key, and is never printed.
       def inspect
-        "#<#{self.class.name} email=#{@email} ip=#{@ip} strict=#{@strict} filters=#{!@filter.nil?}>"
+        "#<#{self.class.name} email=#{@email} ip=#{@ip} strict=#{@strict} filters=#{!@filter.nil?} " \
+          "keys=#{@keys.size} patterns=#{@patterns.size} redactor=#{!@redactor.nil?}>"
       end
       alias to_s inspect
 
@@ -119,11 +127,25 @@ module Packrat
 
       def scrub_body(body)
         case body
-        when String then @strict ? REDACTED : scrub_text(body.gsub(ANSI, ""))
+        when String then @strict ? REDACTED : custom(scrub_text(body.gsub(ANSI, "")), nil)
         when Hash then filter_hash(body).transform_values { |value| scrub_body(value) }
         when Array then body.map { |value| scrub_body(value) }
         else body
         end
+      end
+
+      # Fails closed: a value the app's block cannot answer for is not sent.
+      def custom(value, name)
+        return value unless @redactor && value.is_a?(String)
+
+        result = @redactor.call(value, name)
+        result.is_a?(String) ? result : REDACTED
+      rescue StandardError => error
+        unless @redactor_failed
+          @redactor_failed = true
+          OpenTelemetry.handle_error(exception: error, message: "Packrat: the config.redact block raised, so the values it was given are sent as #{REDACTED}")
+        end
+        REDACTED
       end
 
       def dropped?(key)
@@ -134,7 +156,12 @@ module Packrat
       def scrub_value(key, value)
         return value.map { |item| scrub_value(key, item) } if value.is_a?(Array)
         return value unless value.is_a?(String)
+        return REDACTED if redacted_key?(key)
 
+        custom(builtin(key, value), key)
+      end
+
+      def builtin(key, value)
         if URL_KEYS.include?(key) then redact_values(@strict ? value.split("?", 2).first : redact_query(value))
         elsif TEXT_KEYS.include?(key) then scrub_text(value)
         elsif key.start_with?(CONTEXT_PREFIX) then filtered?(key.delete_prefix(CONTEXT_PREFIX)) ? REDACTED : scrub_text(value)
@@ -143,7 +170,16 @@ module Packrat
         end
       end
 
+      # The whole name, or its last dotted segment: ssn matches ssn and enduser.ssn.
+      def redacted_key?(key)
+        return false if @keys.empty?
+
+        name = key.downcase
+        @keys.include?(name) || @keys.include?(name.rpartition(".").last)
+      end
+
       def redact_values(text)
+        @patterns.each { |pattern| text = text.gsub(pattern, REDACTED) }
         text = text.gsub(EMAIL) { "[email:#{digest(Regexp.last_match(0))}]" } if @email && text.include?("@")
         return text unless @ip
 
@@ -188,14 +224,21 @@ module Packrat
       end
     end
 
+    # With an io (PACKRAT_DEBUG_EXPORT), each item is also written there as one JSON line, exactly as
+    # scrubbed. Not through a Logger: the logger instrumentation would export each line, and print it again.
     class ScrubbingSpanExporter
-      def initialize(exporter, scrubber = Scrubber.new)
+      PREFIX = "Packrat export: ".freeze
+
+      def initialize(exporter, scrubber = Scrubber.new, io: nil)
         @exporter = exporter
         @scrubber = scrubber
+        @io = io
       end
 
       def export(spans, timeout: nil)
-        @exporter.export(@scrubber.scrub_spans(spans), timeout:)
+        spans = @scrubber.scrub_spans(spans)
+        write_lines(spans) { |span| span_line(span) }
+        @exporter.export(spans, timeout:)
       end
 
       def force_flush(timeout: nil)
@@ -205,11 +248,37 @@ module Packrat
       def shutdown(timeout: nil)
         @exporter.shutdown(timeout:)
       end
+
+      private
+
+      def write_lines(items)
+        return unless @io
+
+        @io.write(items.map { |item| "#{PREFIX}#{JSON.generate(yield(item))}\n" }.join)
+      rescue StandardError => error
+        OpenTelemetry.handle_error(exception: error, message: "Packrat: PACKRAT_DEBUG_EXPORT could not print a batch")
+      end
+
+      def span_line(span)
+        {
+          span: span.name, kind: span.kind, trace_id: span.hex_trace_id, span_id: span.hex_span_id,
+          attributes: span.attributes.to_h,
+          events: Array(span.events).map { |event| { name: event.name, attributes: event.attributes.to_h } }
+        }
+      end
     end
 
     class ScrubbingLogExporter < ScrubbingSpanExporter
       def export(records, timeout: nil)
-        @exporter.export(@scrubber.scrub_log_records(records), timeout:)
+        records = @scrubber.scrub_log_records(records)
+        write_lines(records) { |record| log_line(record) }
+        @exporter.export(records, timeout:)
+      end
+
+      private
+
+      def log_line(record)
+        { log: record.body, severity: record.severity_text, attributes: record.attributes.to_h }
       end
     end
   end
