@@ -42,8 +42,8 @@ Packrat: sending traces and logs for shop/production to https://ingest.packrat.s
 
 ## Configuration
 
-The ingest key, the ingest URL and the privacy level are the only settings in `Packrat.configure`. Everything else is
-an environment variable.
+`Packrat.configure` sets the ingest key, the ingest URL, the privacy level,
+[your own redaction](#redact-your-own-data) and `debug_export`. Everything else is an environment variable.
 
 | Variable                        | Default                     | Note                                                         |
 | ------------------------------- | --------------------------- | ------------------------------------------------------------ |
@@ -53,6 +53,7 @@ an environment variable.
 | `PACKRAT_OTEL_INSTRUMENTATIONS` | the list below              | Comma-separated names to add; a leading `-` removes one      |
 | `PACKRAT_PRIVACY`               | `config.privacy`, else `standard` | `standard` or `strict`. Wins over the initializer. Any other value is strict |
 | `PACKRAT_REDACT`                | `email,ip`                  | Patterns redacted from values; `-ip` stops masking IP addresses |
+| `PACKRAT_DEBUG_EXPORT`          | `config.debug_export`, else off | `1` prints everything sent to stdout. See [what is sent](#see-what-is-sent) |
 
 The instrumentations are `rack`, `action_pack`, `action_view`, `active_job`, `active_record`,
 `net_http`, `pg`, `mysql2`, `sidekiq`, `redis`, `aws_sdk`, `concurrent_ruby`, `rake` and `logger`. One for a library that is not in the app installs nothing.
@@ -97,10 +98,46 @@ In standard, the gem redacts:
 - **Credentials**: values named like a key, token, password, secret, signature or credential, and
   `Bearer` or `Basic` values.
 
-Patterns can't recognize other personal data, such as a name or a support ticket's text in a log
-line. If your logs can hold that, use strict: pass `--strict` to the generator, set
+Patterns can't recognize other personal data, such as a name or an account number in a log line.
+To remove that, [redact your own data](#redact-your-own-data). If your logs can hold text you can't
+describe, such as a support ticket's body, use strict: pass `--strict` to the generator, set
 `config.privacy = :strict`, or set `PACKRAT_PRIVACY=strict`. Strict keeps routes, durations, status
 codes, errors by class and the shape of each query, which is what a deploy check needs.
+
+### Redact your own data
+
+Your own keys, patterns and block run after the gem's redaction, in standard and in strict:
+
+```ruby
+Packrat.configure do |config|
+  config.redact_keys = %w[ssn account_number]        # the whole value of these attributes and parameters
+  config.redact_patterns = [/acct \d{4}-\d{2}/]       # each match, in every value and log line
+  config.redact { |value, name| value.gsub(Customer::NAME_PATTERN, "[name]") }
+end
+```
+
+- **`redact_keys`** replaces the value with `[REDACTED]` in a span attribute, a query parameter, a
+  `Rails.error` context key or a key in a structured log line. An attribute matches on its whole name
+  or its last segment (`ssn` matches `enduser.ssn`). Unlike `filter_parameters`, a key matches only a
+  whole name: `ssn` doesn't match `ssn_last4`.
+- **`redact_patterns`** replaces each match with `[REDACTED]`. A string is matched literally.
+- **The `redact` block** receives each string value and its attribute name (`nil` for a log line) and
+  returns the string to send. If it raises or returns something other than a string, the gem sends
+  `[REDACTED]` and logs one warning.
+
+### See what is sent
+
+Set `PACKRAT_DEBUG_EXPORT=1`, or `config.debug_export = true`, and the gem prints each span and log
+line to stdout as it is sent, after redaction:
+
+```
+Packrat export: {"span":"GET /orders/:id","kind":"server","attributes":{"url.query":"token=[REDACTED]&page=2",…},"events":[]}
+Packrat export: {"log":"Refund issued to [email:4f2a91c0]","severity":"INFO","attributes":{}}
+```
+
+Everything is still sent to Packrat. `PACKRAT_DEBUG_EXPORT=0` wins over the initializer.
+
+How long Packrat keeps your data: https://packrat.sh/docs/ruby-on-rails#how-long-data-is-kept
 
 ## Beside other tools
 
