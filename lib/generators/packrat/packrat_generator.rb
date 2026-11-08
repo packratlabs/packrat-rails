@@ -18,7 +18,8 @@ module Packrat
                                  desc: "Turn on the Packrat plugin for Claude Code in .claude/settings.json"
 
       CLAUDE_SETTINGS = ".claude/settings.json"
-      MARKETPLACE = { "source" => { "source" => "github", "repo" => "packratlabs/claude-plugin" } }.freeze
+      # Claude Code leaves a marketplace that is not Anthropic's off auto-update, and says nothing when it has a newer plugin.
+      MARKETPLACE = { "source" => { "source" => "github", "repo" => "packratlabs/claude-plugin" }, "autoUpdate" => true }.freeze
       PLUGIN = "packrat@packrat"
 
       def create_initializer
@@ -26,7 +27,7 @@ module Packrat
       end
 
       # Everyone who opens Claude Code in the repository and trusts the folder gets the plugin. Other
-      # settings in the file are kept, and so is a plugin someone turned off on purpose.
+      # settings in the file are kept, and so is a plugin someone turned off on purpose, or auto-update turned off.
       def enable_claude_code_plugin
         return unless options[:claude_code]
 
@@ -59,7 +60,8 @@ module Packrat
 
       def settings_json(settings)
         settings = settings.dup
-        settings["extraKnownMarketplaces"] = { "packrat" => MARKETPLACE }.merge(settings["extraKnownMarketplaces"] || {})
+        known = settings["extraKnownMarketplaces"] || {}
+        settings["extraKnownMarketplaces"] = known.merge("packrat" => MARKETPLACE.merge(known["packrat"] || {}))
         settings["enabledPlugins"] = { PLUGIN => true }.merge(settings["enabledPlugins"] || {})
         "#{JSON.pretty_generate(settings)}\n"
       end

@@ -45,9 +45,18 @@ class GeneratorTest < PackratTest
   def test_turns_on_the_claude_code_plugin
     settings = JSON.parse(claude_settings)
 
-    assert_equal({ "source" => { "source" => "github", "repo" => "packratlabs/claude-plugin" } },
+    assert_equal({ "source" => { "source" => "github", "repo" => "packratlabs/claude-plugin" }, "autoUpdate" => true },
                  settings.dig("extraKnownMarketplaces", "packrat"))
     assert_equal true, settings.dig("enabledPlugins", "packrat@packrat")
+  end
+
+  def test_turns_on_auto_update_for_a_marketplace_added_before_it_unless_turned_off
+    source = { "source" => "github", "repo" => "packratlabs/claude-plugin" }
+    added = JSON.parse(claude_settings(JSON.generate("extraKnownMarketplaces" => { "packrat" => { "source" => source } })))
+    off = JSON.parse(claude_settings(JSON.generate("extraKnownMarketplaces" => { "packrat" => { "source" => source, "autoUpdate" => false } })))
+
+    assert_equal true, added.dig("extraKnownMarketplaces", "packrat", "autoUpdate")
+    assert_equal false, off.dig("extraKnownMarketplaces", "packrat", "autoUpdate")
   end
 
   def test_keeps_the_rest_of_the_claude_code_settings
