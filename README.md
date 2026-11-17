@@ -37,7 +37,7 @@ On boot the gem writes one line to the Rails log. It names the service and envir
 reports under:
 
 ```
-Packrat: sending traces and logs for shop/production to https://ingest.packrat.sh (rack, action_pack, active_job, active_record, net_http, pg, logger); redacting email and ip
+Packrat: sending traces and logs for shop/production to https://ingest.packrat.sh (rack, action_pack, active_job, net_http, pg, logger); redacting email and ip
 ```
 
 ## Configuration
@@ -55,11 +55,17 @@ Packrat: sending traces and logs for shop/production to https://ingest.packrat.s
 | `PACKRAT_REDACT`                | `email,ip`                  | Patterns redacted from values; `-ip` stops masking IP addresses |
 | `PACKRAT_DEBUG_EXPORT`          | `config.debug_export`, else off | `1` prints everything sent to stdout. See [what is sent](#see-what-is-sent) |
 
-The instrumentations are `rack`, `action_pack`, `action_view`, `active_job`, `active_record`,
-`net_http`, `pg`, `mysql2`, `sidekiq`, `redis`, `aws_sdk`, `concurrent_ruby`, `rake` and `logger`. One for a library that is not in the app installs nothing.
+The instrumentations are `rack`, `action_pack`, `action_view`, `active_job`, `net_http`, `pg`,
+`mysql2`, `sidekiq`, `redis`, `aws_sdk`, `concurrent_ruby`, `rake` and `logger`. One for a library that is not in the app installs nothing.
 `PACKRAT_OTEL_INSTRUMENTATIONS=faraday,-action_view` adds Faraday (with
 `opentelemetry-instrumentation-faraday` in the Gemfile) and removes Action View. `action_mailer` and
 `active_storage` cannot be added: they must load before boot ends.
+
+Each database query is one span. The `pg` or `mysql2` span is named after the query the way the
+Rails log names it (`Order Load`, `Order Create`, `TRANSACTION`) and carries the SQL in
+`db.statement`. A query Rails does not name, such as `connection.select_value`, keeps the driver's
+name. `active_record` is not on the list because its span wraps the driver's and would record each
+query twice. `PACKRAT_OTEL_INSTRUMENTATIONS=active_record` adds it back.
 
 The service name is `OTEL_SERVICE_NAME`, else `service.name` in `OTEL_RESOURCE_ATTRIBUTES`, else the
 app's module name (`Shop::Application` is `shop`). The environment is `Rails.env` unless

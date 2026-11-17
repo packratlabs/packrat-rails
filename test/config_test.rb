@@ -8,7 +8,7 @@ class ConfigTest < PackratTest
     assert_equal "https://ingest.packrat.sh/v1/traces", config.traces_endpoint
     assert_equal "https://ingest.packrat.sh/v1/logs", config.logs_endpoint
     assert_equal({ "Authorization" => CANARY }, config.headers)
-    assert_equal %w[rack action_pack action_view active_job active_record net_http pg mysql2 sidekiq redis aws_sdk concurrent_ruby rake logger], config.instrumentations
+    assert_equal %w[rack action_pack action_view active_job net_http pg mysql2 sidekiq redis aws_sdk concurrent_ruby rake logger], config.instrumentations
     assert config.enabled?
   end
 
@@ -81,7 +81,7 @@ class ConfigTest < PackratTest
   def test_instrumentations_add_and_remove
     config = config({ "PACKRAT_OTEL_INSTRUMENTATIONS" => "faraday, -pg,rack,sidekiq" })
 
-    assert_equal %w[rack action_pack action_view active_job active_record net_http mysql2 sidekiq redis aws_sdk concurrent_ruby rake logger faraday],
+    assert_equal %w[rack action_pack action_view active_job net_http mysql2 sidekiq redis aws_sdk concurrent_ruby rake logger faraday],
                  config.instrumentations
   end
 
