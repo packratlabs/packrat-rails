@@ -6,6 +6,7 @@ require_relative "packrat/config"
 require_relative "packrat/otel/scrubber"
 require_relative "packrat/otel/error_spans"
 require_relative "packrat/otel/root_kind_sampler"
+require_relative "packrat/otel/query_names"
 require_relative "packrat/otel"
 require_relative "packrat/rack_span"
 require_relative "packrat/railtie" if defined?(Rails::Railtie)

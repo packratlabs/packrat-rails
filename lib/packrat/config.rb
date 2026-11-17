@@ -6,7 +6,7 @@ module Packrat
   # wins: the gem fills in only what the standard variables leave empty.
   class Config
     DEFAULT_URL = "https://ingest.packrat.sh".freeze
-    INSTRUMENTATIONS = %w[rack action_pack action_view active_job active_record net_http pg mysql2 sidekiq redis aws_sdk concurrent_ruby rake logger].freeze
+    INSTRUMENTATIONS = %w[rack action_pack action_view active_job net_http pg mysql2 sidekiq redis aws_sdk concurrent_ruby rake logger].freeze
     COMMIT_VARIABLES = %w[BUILD_COMMIT HEROKU_SLUG_COMMIT SOURCE_VERSION].freeze
     REDACTIONS = %w[email ip].freeze
     PRIVACY = %w[standard strict].freeze

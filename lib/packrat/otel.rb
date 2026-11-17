@@ -21,6 +21,8 @@ module Packrat
     BOOT_ONLY = %w[action_mailer active_storage].freeze
     ACTION_VIEW_EVENTS = %w[render_template render_partial render_collection render_layout].map { |event| "#{event}.action_view" }.freeze
     EXIT_TIMEOUT = 5
+    # The drivers whose spans take the name Rails gives each query (QueryNames).
+    QUERY_DRIVERS = %w[pg mysql2 trilogy].freeze
 
     # dogstatsd-ruby defines Datadog::Statsd without the tracer, hence the method check.
     def self.datadog?
@@ -84,6 +86,7 @@ module Packrat
         @outcome = :configured
         step("sampler") { use_sampler } unless @config.set?("OTEL_TRACES_SAMPLER")
         @config.instrumentations.each { |name| step("instrumentation #{name}") { install(name) } }
+        step("query names") { QueryNames.install(OpenTelemetry.tracer_provider) } if (@installed & QUERY_DRIVERS).any?
         step("Rails.error") { @errors.subscribe(ErrorSpans.new(scrubber)) }
         step("at_exit") { at_exit { shutdown_providers } }
         @line = "Packrat: sending #{signals(records)} for #{@config.service_name}/#{@config.environment} " \

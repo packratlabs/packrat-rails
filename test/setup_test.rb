@@ -20,10 +20,11 @@ class SetupTest < PackratTest
 
     assert_kind_of OpenTelemetry::SDK::Logs::LoggerProvider, OpenTelemetry.logger_provider
     assert_match "RootKindSampler", provider.sampler.description
-    installed = %w[rack action_pack action_view active_job active_record net_http pg mysql2 sidekiq redis aws_sdk concurrent_ruby rake logger]
+    installed = %w[rack action_pack action_view active_job net_http pg mysql2 sidekiq redis aws_sdk concurrent_ruby rake logger]
     assert_equal installed, setup.installed
     assert_equal({ untraced_endpoints: [ "/up" ] }, @instrumentations["rack"].config)
     assert_kind_of Packrat::Otel::ErrorSpans, @errors.subscribers.sole
+    assert(provider.instance_variable_get(:@span_processors).any?(Packrat::Otel::QueryNames), "a driver is installed, so its spans take Rails' query names")
     assert_equal "Packrat: sending traces and logs for shop/production to #{URL} " \
                  "(#{installed.join(', ')}); redacting email and ip", setup.line
     assert_includes log, setup.line
@@ -39,10 +40,11 @@ class SetupTest < PackratTest
   end
 
   def test_configure_lists_only_what_installed
-    instrumentations = Hash.new { |hash, name| hash[name] = FakeInstrumentation.new(present: %w[rack action_pack active_job active_record net_http logger].include?(name)) }
+    instrumentations = Hash.new { |hash, name| hash[name] = FakeInstrumentation.new(present: %w[rack action_pack active_job net_http logger].include?(name)) }
     setup = run_setup(config, instrumentations:)
 
-    assert_equal %w[rack action_pack active_job active_record net_http logger], setup.installed
+    assert_equal %w[rack action_pack active_job net_http logger], setup.installed
+    refute(OpenTelemetry.tracer_provider.instance_variable_get(:@span_processors).any?(Packrat::Otel::QueryNames), "no driver, so no query names")
   end
 
   def test_configure_leaves_a_sampler_named_by_the_environment
