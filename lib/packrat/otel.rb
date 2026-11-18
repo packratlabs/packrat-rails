@@ -143,15 +143,13 @@ module Packrat
       end
 
       def span_processor
-        OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(
-          ScrubbingSpanExporter.new(OpenTelemetry::Exporter::OTLP::Exporter.new(endpoint: @config.traces_endpoint, headers: @config.headers), scrubber, io: debug_io)
-        )
+        build = -> { OpenTelemetry::Exporter::OTLP::Exporter.new(endpoint: @config.traces_endpoint, headers: @config.headers) }
+        OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(ScrubbingSpanExporter.new(build.call, scrubber, io: debug_io, &build))
       end
 
       def log_record_processor
-        OpenTelemetry::SDK::Logs::Export::BatchLogRecordProcessor.new(
-          ScrubbingLogExporter.new(OpenTelemetry::Exporter::OTLP::Logs::LogsExporter.new(endpoint: @config.logs_endpoint, headers: @config.headers), scrubber, io: debug_io)
-        )
+        build = -> { OpenTelemetry::Exporter::OTLP::Logs::LogsExporter.new(endpoint: @config.logs_endpoint, headers: @config.headers) }
+        OpenTelemetry::SDK::Logs::Export::BatchLogRecordProcessor.new(ScrubbingLogExporter.new(build.call, scrubber, io: debug_io, &build))
       rescue NameError => error
         raise unless error.name == :Utilities
 

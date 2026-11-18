@@ -229,27 +229,40 @@ module Packrat
     class ScrubbingSpanExporter
       PREFIX = "Packrat export: ".freeze
 
-      def initialize(exporter, scrubber = Scrubber.new, io: nil)
+      # With a block, a forked process builds its own exporter with it: the parent's holds a TLS connection
+      # that is open in both, and a write from the child corrupts the session ("bad record mac"). That
+      # includes the shutdown at exit, which closes the connection by writing to it.
+      def initialize(exporter, scrubber = Scrubber.new, io: nil, &rebuild)
         @exporter = exporter
         @scrubber = scrubber
         @io = io
+        @rebuild = rebuild
+        @pid = Process.pid
       end
 
       def export(spans, timeout: nil)
         spans = @scrubber.scrub_spans(spans)
         write_lines(spans) { |span| span_line(span) }
-        @exporter.export(spans, timeout:)
+        exporter.export(spans, timeout:)
       end
 
       def force_flush(timeout: nil)
-        @exporter.force_flush(timeout:)
+        exporter.force_flush(timeout:)
       end
 
       def shutdown(timeout: nil)
-        @exporter.shutdown(timeout:)
+        exporter.shutdown(timeout:)
       end
 
       private
+
+      def exporter
+        if @rebuild && @pid != Process.pid
+          @pid = Process.pid
+          @exporter = @rebuild.call
+        end
+        @exporter
+      end
 
       def write_lines(items)
         return unless @io
@@ -272,7 +285,7 @@ module Packrat
       def export(records, timeout: nil)
         records = @scrubber.scrub_log_records(records)
         write_lines(records) { |record| log_line(record) }
-        @exporter.export(records, timeout:)
+        exporter.export(records, timeout:)
       end
 
       private
