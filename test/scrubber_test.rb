@@ -381,4 +381,45 @@ class ScrubberTest < PackratTest
 
     assert_equal [ 1, 1 ], [ recording.flushes, recording.shutdowns ]
   end
+  def test_a_forked_process_exports_and_shuts_down_through_an_exporter_of_its_own
+    parent = RecordingExporter.new
+    built = []
+    exporter = Packrat::Otel::ScrubbingSpanExporter.new(parent) { RecordingExporter.new.tap { |fresh| built << fresh } }
+    exporter.export([])
+    reader, writer = IO.pipe
+
+    pid = fork do
+      reader.close
+      exporter.export([])
+      exporter.export([])
+      exporter.shutdown
+      writer.write(Marshal.dump([ parent.batches.size, parent.shutdowns, built.size, built.first.batches.size, built.first.shutdowns ]))
+      writer.close
+      exit!(0)
+    end
+    writer.close
+    Process.wait(pid)
+
+    assert_equal [ 1, 0, 1, 2, 1 ], Marshal.load(reader.read)
+    exporter.export([])
+    assert_equal [ 2, [] ], [ parent.batches.size, built ]
+  end
+
+  def test_without_a_block_a_forked_process_keeps_the_exporter_it_was_given
+    recording = RecordingExporter.new
+    exporter = Packrat::Otel::ScrubbingLogExporter.new(recording)
+    reader, writer = IO.pipe
+
+    pid = fork do
+      reader.close
+      exporter.export([])
+      writer.write(recording.batches.size.to_s)
+      writer.close
+      exit!(0)
+    end
+    writer.close
+    Process.wait(pid)
+
+    assert_equal "1", reader.read
+  end
 end
