@@ -20,6 +20,7 @@ class SetupTest < PackratTest
 
     assert_kind_of OpenTelemetry::SDK::Logs::LoggerProvider, OpenTelemetry.logger_provider
     assert_match "RootKindSampler", provider.sampler.description
+    assert_match "TraceBudget", provider.sampler.description
     installed = %w[rack action_pack action_view active_job net_http pg mysql2 sidekiq redis aws_sdk concurrent_ruby rake logger]
     assert_equal installed, setup.installed
     assert_equal({ untraced_endpoints: [ "/up" ] }, @instrumentations["rack"].config)
@@ -172,15 +173,17 @@ class SetupTest < PackratTest
 
   def test_root_kind_sampler
     sampler = Packrat::Otel::RootKindSampler.new
-    decide = ->(kind, name = "x") do
-      sampler.should_sample?(trace_id: "t", parent_context: OpenTelemetry::Context.empty, links: [], name:, kind:, attributes: {}).sampled?
+    decide = ->(kind, name = "x", attributes = {}) do
+      sampler.should_sample?(trace_id: "t", parent_context: OpenTelemetry::Context.empty, links: [], name:, kind:, attributes:).sampled?
     end
 
     assert decide.(:server)
     assert decide.(:consumer)
     assert decide.(:internal, "Rails.error")
     assert decide.(:internal, "rake.invoke")
-    assert decide.(:internal, "rake.execute")
+    assert decide.(:internal, "rake.execute", { "rake.task" => "db:migrate" })
+    refute decide.(:internal, "rake.execute", { "rake.task" => "solid_queue:start" })
+    refute decide.(:internal, "rake.invoke", { "rake.task" => "jobs:work" })
     refute decide.(:client)
     refute decide.(:internal)
   end

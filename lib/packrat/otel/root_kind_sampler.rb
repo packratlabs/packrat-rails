@@ -4,13 +4,15 @@ module Packrat
     # anything else is a poll: Solid Queue and Solid Cable each ask Postgres for work about ten times
     # a second, and every poll would otherwise be a trace of its own. Children never reach this class;
     # parent_based routes only roots here, and a child follows its root. A Rake task is work too,
-    # though its span is internal; when Rails boots inside the task, the root is its execute.
+    # though its span is internal; when Rails boots inside the task, the root is its execute. A task
+    # that runs a server is not: its root lasts the life of the process and every poll is its child.
     class RootKindSampler
       KEEP = %i[server consumer].freeze
       NAMES = [ ErrorSpans::NAME, "rake.invoke", "rake.execute" ].freeze
+      SERVER_TASKS = %w[solid_queue:start jobs:work].freeze
 
       def should_sample?(trace_id:, parent_context:, links:, name:, kind:, attributes:)
-        keep = KEEP.include?(kind) || NAMES.include?(name)
+        keep = KEEP.include?(kind) || (NAMES.include?(name) && !SERVER_TASKS.include?(attributes&.dig("rake.task")))
         decision = keep ? OpenTelemetry::SDK::Trace::Samplers::Decision::RECORD_AND_SAMPLE
                         : OpenTelemetry::SDK::Trace::Samplers::Decision::DROP
         tracestate = OpenTelemetry::Trace.current_span(parent_context).context.tracestate
