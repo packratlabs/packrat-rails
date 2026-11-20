@@ -168,7 +168,7 @@ module Packrat
 
       def use_sampler
         OpenTelemetry.tracer_provider.sampler =
-          OpenTelemetry::SDK::Trace::Samplers.parent_based(root: RootKindSampler.new)
+          OpenTelemetry::SDK::Trace::Samplers.parent_based(root: RootKindSampler.new, local_parent_sampled: TraceBudget.new)
       end
 
       def install(name)
