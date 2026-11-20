@@ -4,7 +4,7 @@ Gem::Specification.new do |spec|
   spec.name = "packrat-rails"
   spec.version = Packrat::VERSION
   spec.authors = [ "Packrat Labs" ]
-  spec.summary = "OpenTelemetry for Rails, configured to send to Packrat with one key"
+  spec.summary = "Sends a Rails app's exceptions, traces and logs to Packrat, which checks every pull request in production"
   spec.homepage = "https://packrat.sh/docs/ruby-on-rails"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.1"
