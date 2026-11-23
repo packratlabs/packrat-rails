@@ -51,6 +51,14 @@ class ConfigTest < PackratTest
     assert config({ "PACKRAT_DISABLED" => "0" }).enabled?
   end
 
+  def test_the_asset_build_sends_nothing
+    building = Packrat::Config.new(env: { "PACKRAT_INGEST_KEY" => CANARY }, rails_env: "production", tasks: %w[assets:precompile])
+
+    refute building.allowed?
+    assert_equal "this is the asset build, so nothing is sent", building.off_reason
+    assert Packrat::Config.new(env: { "PACKRAT_INGEST_KEY" => CANARY }, rails_env: "production", tasks: %w[db:migrate]).enabled?
+  end
+
   def test_the_key_from_the_initializer
     config = config({ "PACKRAT_INGEST_KEY" => "" })
     refute config.enabled?
