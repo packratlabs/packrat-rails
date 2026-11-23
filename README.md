@@ -39,6 +39,8 @@ The generator creates `config/initializers/packrat.rb` and turns on the
 An ingest key can only send data, so you can commit both files.
 
 To turn the gem off, set `PACKRAT_DISABLED=1`. The app then boots as if the gem were not installed.
+The gem is also off while `assets:precompile` runs, so a build that boots your new code is not
+recorded as a deploy.
 
 ## Privacy
 

@@ -10,14 +10,17 @@ module Packrat
     COMMIT_VARIABLES = %w[BUILD_COMMIT HEROKU_SLUG_COMMIT SOURCE_VERSION].freeze
     REDACTIONS = %w[email ip].freeze
     PRIVACY = %w[standard strict].freeze
+    # A platform's build runs these with the new code, minutes before any process serves it.
+    BUILD_TASKS = %w[assets:precompile assets:clean].freeze
     REDACTED = "[redacted]".freeze
     DISTRO_ATTRIBUTES = { "telemetry.distro.name" => "packrat-rails", "telemetry.distro.version" => VERSION }.freeze
 
     attr_reader :rails_env, :app_name, :redactor
     attr_writer :ingest_key, :ingest_url, :privacy, :redact_keys, :redact_patterns, :debug_export
 
-    def initialize(env: ENV, rails_env: nil, app_name: nil)
+    def initialize(env: ENV, rails_env: nil, app_name: nil, tasks: nil)
       @env = env
+      @tasks = tasks
       @rails_env = rails_env.to_s
       @app_name = app_name
     end
@@ -48,6 +51,7 @@ module Packrat
       if rails_env == "test" then nil
       elsif flag?("PACKRAT_DISABLED") then "PACKRAT_DISABLED is set, so nothing is sent"
       elsif sdk_disabled? then "OTEL_SDK_DISABLED is true, so nothing is sent"
+      elsif building? then "this is the asset build, so nothing is sent"
       elsif key.nil? then "no ingest key is set (PACKRAT_INGEST_KEY or config.ingest_key), so nothing is sent"
       end
     end
@@ -58,7 +62,7 @@ module Packrat
 
     # Everything but the key. The middleware is placed before config/initializers set the key.
     def allowed?
-      rails_env != "test" && !flag?("PACKRAT_DISABLED") && !sdk_disabled?
+      rails_env != "test" && !flag?("PACKRAT_DISABLED") && !sdk_disabled? && !building?
     end
 
     # PACKRAT_OTEL_INSTRUMENTATIONS=sidekiq,-pg adds sidekiq to the allowlist and takes pg out.
@@ -163,6 +167,11 @@ module Packrat
       @env[name].to_s.split(",").map(&:strip).reject(&:empty?).reduce(defaults.dup) do |names, entry|
         entry.start_with?("-") ? names - [ entry.delete_prefix("-") ] : names | [ entry ]
       end
+    end
+
+    def building?
+      tasks = @tasks || (defined?(Rake) && Rake.respond_to?(:application) ? Rake.application.top_level_tasks : [])
+      tasks.intersect?(BUILD_TASKS)
     end
 
     def sdk_disabled?
