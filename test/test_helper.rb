@@ -62,8 +62,8 @@ class PackratTest < Minitest::Test
   end
 
   # Runs Setup with fake instrumentations and no at_exit hook, so a test leaves nothing behind.
-  def run_setup(config, instrumentations: Hash.new { |hash, name| hash[name] = FakeInstrumentation.new })
-    setup = Packrat::Otel::Setup.new(config:, logger: @logger, errors: @errors)
+  def run_setup(config, instrumentations: Hash.new { |hash, name| hash[name] = FakeInstrumentation.new }, filters: [])
+    setup = Packrat::Otel::Setup.new(config:, logger: @logger, errors: @errors, filters:)
     @instrumentations = instrumentations
     setup.stub(:instrumentation, ->(name) { instrumentations[name] }) do
       setup.stub(:subscribe_action_view, nil) do

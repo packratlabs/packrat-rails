@@ -16,7 +16,7 @@ module Packrat
     DISTRO_ATTRIBUTES = { "telemetry.distro.name" => "packrat-rails", "telemetry.distro.version" => VERSION }.freeze
 
     attr_reader :rails_env, :app_name, :redactor
-    attr_writer :ingest_key, :ingest_url, :privacy, :redact_keys, :redact_patterns, :debug_export
+    attr_writer :ingest_key, :ingest_url, :privacy, :redact_keys, :redact_patterns, :debug_export, :browser
 
     def initialize(env: ENV, rails_env: nil, app_name: nil, tasks: nil)
       @env = env
@@ -101,6 +101,16 @@ module Packrat
     # redaction; name is the attribute's, or nil for a log line.
     def redact(&block)
       @redactor = block
+    end
+
+    # Which pages send browser events: true, false, or a lambda that gets the request. A controller's
+    # packrat_browser and skip_packrat_browser win for the actions they name.
+    def browser
+      @browser.nil? ? true : @browser
+    end
+
+    def browser?
+      browser != false
     end
 
     # The variable wins over the initializer, so PACKRAT_DEBUG_EXPORT=0 silences a committed setting.

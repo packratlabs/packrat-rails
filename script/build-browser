@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Builds lib/packrat/browser/packrat-browser.js from browser/index.js and the SDK pinned in
+# browser/package-lock.json. Run it after changing either, and commit the built file.
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$root/browser"
+
+npm ci --no-audit --no-fund --silent
+
+sdk_version="$(node -p 'require("@datadog/browser-rum-slim/package.json").version')"
+gem_version="$(ruby -r "$root/lib/packrat/version" -e 'print Packrat::VERSION')"
+banner="/*! @datadog/browser-rum-slim ${sdk_version} | Apache-2.0 | https://github.com/DataDog/browser-sdk | Copyright 2019-Present Datadog, Inc. Bundled with a different entry point by packrat-rails ${gem_version}; see LICENSE-THIRD-PARTY. */"
+
+npx esbuild index.js \
+  --bundle \
+  --minify \
+  --format=iife \
+  --target=es2018 \
+  --legal-comments=none \
+  --banner:js="$banner" \
+  --outfile="$root/lib/packrat/browser/packrat-browser.js"

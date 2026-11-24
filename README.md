@@ -15,7 +15,7 @@ request after it deploys and tells you which aren't working.
    open a fix.
 
 This gem sends Packrat that data from a Rails app. It sets up OpenTelemetry to send exceptions,
-traces and logs with one key. It requires Rails 7.1 or newer and Ruby 3.1 or newer.
+traces and logs, and adds a script to your pages that sends browser events, all with one key. It requires Rails 7.1 or newer and Ruby 3.1 or newer.
 
 ## Install
 
@@ -49,10 +49,71 @@ IP addresses, your `filter_parameters` and credentials. Strict privacy sends no 
 or exception messages. See [Privacy](https://packrat.sh/docs/ruby-on-rails#privacy) for what is sent
 at each level and how to redact your own data.
 
+## Browser events
+
+The gem adds a script to every HTML page your app renders. The script sends browser events to
+Packrat: page views, clicks, JavaScript errors, the requests the page makes, and Web Vitals. Packrat
+uses them to check a pull request that changes a page against what visitors did on it.
+
+Browser events are on by default and need no setup. The gem serves the script from your app at
+`/packrat/browser-<version>.js` and adds a `<script defer>` tag before `</head>`. It leaves alone
+responses that are not HTML, downloads, streamed responses and Turbo Frame requests. When your app
+has a `Current.user`, the script sends the user's `id`.
+
+To turn browser events off, set `config.browser` in `config/initializers/packrat.rb`:
+
+```ruby
+Packrat.configure do |config|
+  config.browser = false
+end
+```
+
+To choose pages by request, pass a lambda. It gets the request and returns `true` to send events:
+
+```ruby
+config.browser = ->(request) { !request.path.start_with?("/admin") }
+```
+
+A controller can choose for its own actions. Both macros take `only:` and `except:`, and they win
+over `config.browser` for the actions they name:
+
+```ruby
+class Admin::BaseController < ApplicationController
+  skip_packrat_browser
+end
+
+class CheckoutsController < ApplicationController
+  packrat_browser only: %i[new show]
+end
+```
+
+To keep an element's text out of click names, add `data-packrat-hide` to it or to a parent. A click
+inside it is sent as `(hidden)`. The script also hides clicks inside `data-sentry-block` and
+`data-sentry-mask`.
+
+```erb
+<div data-packrat-hide><%= @account.api_key %></div>
+```
+
+The script redacts query string values in the URLs it sends, using the same parameter names the gem
+redacts on the server: credentials, your `filter_parameters` and `config.redact_keys`. With
+`config.privacy = :strict`, it sends URLs without their query strings and sends no click names.
+
+If your app sets a content security policy, allow the script to send to the ingest host:
+
+```ruby
+Rails.application.config.content_security_policy do |policy|
+  policy.connect_src :self, "https://ingest.packrat.sh"
+end
+```
+
+The script tag carries your policy's nonce when Rails generates one, and it loads from your own host,
+so `script-src 'self'` allows it.
+
 ## Documentation
 
 The [Ruby on Rails guide](https://packrat.sh/docs/ruby-on-rails) covers the generator's options,
 configuration, privacy, how to see what is sent, and running beside Sentry, Datadog or your own
 OpenTelemetry setup.
 
-Released under the MIT License.
+Released under the MIT License. The browser script bundles Datadog's browser SDK under the Apache License 2.0; see `LICENSE-THIRD-PARTY`.

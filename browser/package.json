@@ -1,0 +1,13 @@
+{
+  "name": "packrat-browser",
+  "private": true,
+  "description": "The page script packrat-rails serves; script/build-browser builds it into lib/packrat/browser/packrat-browser.js",
+  "license": "MIT",
+  "dependencies": {
+    "@datadog/browser-rum-core": "7.18.0",
+    "@datadog/browser-rum-slim": "7.18.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
+}

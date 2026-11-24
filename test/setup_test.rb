@@ -26,9 +26,39 @@ class SetupTest < PackratTest
     assert_equal({ untraced_endpoints: [ "/up" ] }, @instrumentations["rack"].config)
     assert_kind_of Packrat::Otel::ErrorSpans, @errors.subscribers.sole
     assert(provider.instance_variable_get(:@span_processors).any?(Packrat::Otel::QueryNames), "a driver is installed, so its spans take Rails' query names")
-    assert_equal "Packrat: sending traces and logs for shop/production to #{URL} " \
+    assert_equal "Packrat: sending traces, logs and browser events for shop/production to #{URL} " \
                  "(#{installed.join(', ')}); redacting email and ip", setup.line
     assert_includes log, setup.line
+  end
+
+  def test_the_boot_line_leaves_out_browser_events_when_they_are_off
+    off = config
+    off.browser = false
+    setup = run_setup(off)
+
+    assert_match(/\APackrat: sending traces and logs for shop\/production to /, setup.line)
+  end
+
+  def test_append_leaves_out_browser_events_when_they_are_off
+    sdk_provider
+    off = config
+    off.browser = false
+
+    assert_match(/\APackrat: sending a copy of the app's traces for shop\/production/, run_setup(off).line)
+  end
+
+  def test_browser_events_follow_what_the_gem_sends
+    assert run_setup(config).browser?
+    teardown
+    setup
+
+    sdk_provider
+    assert run_setup(config).browser?
+    setup
+
+    sdk_provider
+    refute run_setup(config({ "OTEL_EXPORTER_OTLP_ENDPOINT" => URL })).browser?, "the app's exporter sends, not the gem"
+    refute run_setup(config({ "PACKRAT_INGEST_KEY" => nil })).browser?
   end
 
   def test_the_boot_line_names_the_apps_own_redaction_and_debug_export
@@ -69,7 +99,7 @@ class SetupTest < PackratTest
     assert_same own, processors.first
     assert_equal "#{URL}/v1/traces", exporters(provider).last.instance_variable_get(:@uri).to_s
     assert_empty setup.installed
-    assert_equal "Packrat: sending a copy of the app's traces for shop/production to #{URL}; " \
+    assert_equal "Packrat: sending a copy of the app's traces, and browser events, for shop/production to #{URL}; " \
                  "redacting email and ip; Rails.error is now recorded on spans, which the app's own exporter also receives", setup.line
   end
 
@@ -92,7 +122,7 @@ class SetupTest < PackratTest
     setup = run_setup(config) { |subject| subject.define_singleton_method(:logger_instrumented?) { false } }
 
     assert_empty logger_provider.instance_variable_get(:@log_record_processors)
-    assert_match "app's traces for", setup.line
+    assert_match "app's traces, and browser events, for", setup.line
   end
 
   def test_append_leaves_an_error_subscriber_the_app_already_has
