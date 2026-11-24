@@ -10,6 +10,7 @@ require_relative "packrat/otel/trace_budget"
 require_relative "packrat/otel/query_names"
 require_relative "packrat/otel"
 require_relative "packrat/rack_span"
+require_relative "packrat/browser"
 require_relative "packrat/railtie" if defined?(Rails::Railtie)
 
 module Packrat
@@ -40,8 +41,14 @@ module Packrat
     def guard(name)
       yield
     rescue StandardError, LoadError => error
+      failed(name, error)
+      nil
+    end
+
+    def failed(name, error)
       key = (config.key rescue nil)
       Rails.logger&.warn("Packrat: #{name} failed (#{error.class}: #{redact(error.message, key)}); the app runs without it")
+    rescue StandardError
       nil
     end
 

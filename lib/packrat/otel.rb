@@ -32,7 +32,7 @@ module Packrat
     # The one decision, made at the end of boot: configure OpenTelemetry when nothing has, add a
     # Packrat exporter beside the app's own when something has, and stay out of Datadog's way.
     class Setup
-      attr_reader :outcome, :line, :installed, :warnings
+      attr_reader :config, :filters, :outcome, :line, :installed, :warnings, :service, :environment, :version
 
       def initialize(config:, logger:, errors:, filters: [])
         @config = config
@@ -65,6 +65,12 @@ module Packrat
         app
       end
 
+      # Browser events go only where the gem sends the server's data. config.browser = false still
+      # lets a controller's packrat_browser turn them on for its own actions.
+      def browser?
+        %i[configured appended].include?(@outcome) && !@service.to_s.empty?
+      end
+
       private
 
       def off
@@ -84,6 +90,7 @@ module Packrat
         return @line = "Packrat: OpenTelemetry was not configured, so nothing is sent" unless spans && step("SDK") { configure_sdk(spans, records) }
 
         @outcome = :configured
+        @service, @environment, @version = @config.service_name, @config.environment, @config.service_version
         step("sampler") { use_sampler } unless @config.set?("OTEL_TRACES_SAMPLER")
         @config.instrumentations.each { |name| step("instrumentation #{name}") { install(name) } }
         step("query names") { QueryNames.install(OpenTelemetry.tracer_provider) } if (@installed & QUERY_DRIVERS).any?
@@ -109,9 +116,11 @@ module Packrat
         step("at_exit") { at_exit { [ spans, records ].compact.each { |processor| processor.shutdown(timeout: EXIT_TIMEOUT) } } }
 
         attributes = provider.resource.attribute_enumerator.to_h
-        name = attributes["service.name"]
-        environment = attributes["deployment.environment.name"] || attributes["deployment.environment"]
-        @line = "Packrat: sending a copy of the app's #{signals(records)} for #{name}/#{environment} to #{@config.url}; #{privacy}"
+        name = @service = attributes["service.name"]
+        environment = @environment = attributes["deployment.environment.name"] || attributes["deployment.environment"]
+        @version = attributes["service.version"] || @config.service_version
+        copied = @config.browser? ? "#{signals(records, browser: false)}, and browser events," : signals(records)
+        @line = "Packrat: sending a copy of the app's #{copied} for #{name}/#{environment} to #{@config.url}; #{privacy}"
         @line += "; Rails.error is now recorded on spans, which the app's own exporter also receives" if errors
         if name.nil? || name.start_with?("unknown_service")
           @line += ". Warning: the app's OpenTelemetry resource has no service.name, and the setup screen looks for the app by name"
@@ -265,8 +274,9 @@ module Packrat
         @config.debug_export? ? "#{line}; printing every export to stdout (PACKRAT_DEBUG_EXPORT)" : line
       end
 
-      def signals(records)
-        records ? "traces and logs" : "traces"
+      def signals(records, browser: @config.browser?)
+        names = [ "traces", ("logs" if records), ("browser events" if browser) ].compact
+        names.size > 1 ? "#{names[0..-2].join(', ')} and #{names.last}" : names.first
       end
     end
   end

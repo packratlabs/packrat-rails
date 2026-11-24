@@ -23,7 +23,8 @@ module Packrat
       STRICT_DROPPED_KEYS = %w[url.query http.user_agent user_agent.original].freeze
       # A whole parameter name, or one segment of a snake_case name: api_key and access_token match,
       # keyword and monkey do not.
-      CREDENTIAL_PARAM = /\A(?:[a-z0-9]+_)*(?:key|token|password|passwd|secret|signature|sig|auth|credential)(?:_[a-z0-9]+)*\z/i
+      CREDENTIAL_SEGMENTS = %w[key token password passwd secret signature sig auth credential].freeze
+      CREDENTIAL_PARAM = /\A(?:[a-z0-9]+_)*(?:#{CREDENTIAL_SEGMENTS.join('|')})(?:_[a-z0-9]+)*\z/i
       # Free text is redacted by pattern: log lines and error messages interpolate URLs, which is
       # where a credential usually appears.
       CREDENTIAL_IN_TEXT = /

@@ -3,3 +3,4 @@
 /corpus/runs/
 /vendor/
 /*.gem
+/browser/node_modules/

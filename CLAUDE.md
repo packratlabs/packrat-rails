@@ -34,10 +34,17 @@ them for Packrat from environment variables, and adds no instrumentation of its 
   frames, query shapes. A change that drops one of those from strict is a regression.
 - **An app adds to the gem's setup with `ActiveSupport.on_load(:packrat) { |setup| ... }`**, which
   runs after the decision. `Packrat.configure` sets the ingest key, the URL, the privacy level, the app's own redaction
-  (`redact_keys`, `redact_patterns`, a `redact` block) and `debug_export`, and nothing else; it is what
+  (`redact_keys`, `redact_patterns`, a `redact` block), `debug_export` and `browser`, and nothing else; it is what
   `bin/rails generate packrat --ingest-key=…` writes to `config/initializers/packrat.rb`, and
   `PACKRAT_INGEST_KEY` wins over it. The key arrives after the Railtie's initializers run, so the
   middleware is placed on `Config#allowed?`, never `enabled?`.
+- **Browser events are `Packrat::Browser`**, middleware the Railtie puts at the end of the stack (on
+  `allowed?`), so it sees `action_controller.instance` and the body before anything wraps it. It serves
+  `lib/packrat/browser/packrat-browser.js`, which `script/build-browser` builds from `browser/index.js`
+  and the SDK pinned in `browser/package-lock.json`; rebuild and commit it after changing either. The
+  script sets no global, and its proxy always points at the ingest URL. A customer never sees the SDK's
+  vendor name: not in a file name, config, the boot line or the README, only in the script's license
+  header and `LICENSE-THIRD-PARTY`.
 - **Standard variables win.** The gem never writes `ENV`; it passes its values as arguments.
 - Service objects: `new(args)`, `call` returns `self`, results on readers.
 - Comment only what the code cannot say. Requires at the top of a file, except where a comment says

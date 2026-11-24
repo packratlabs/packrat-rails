@@ -47,7 +47,7 @@ class FailSoftTest < PackratTest
     setup = run_setup(config) { |subject| fail_in(subject, :load_logs, LoadError) }
 
     assert_equal :configured, setup.outcome
-    assert_match "Packrat: sending traces for shop/production", setup.line
+    assert_match "Packrat: sending traces and browser events for shop/production", setup.line
   end
 
   def test_an_instrumentation_that_must_load_during_boot_is_a_warning

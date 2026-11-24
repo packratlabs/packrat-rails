@@ -6,6 +6,14 @@ module Packrat
       Packrat.guard("middleware") do
         app.config.middleware.insert_before(0, RackSpan) if Packrat.config.allowed? && !Otel.datadog?
       end
+      Packrat.guard("browser events") do
+        app.config.middleware.use(Browser) if Packrat.config.allowed?
+      end
+    end
+
+    # Registered when the gem is required, so a controller defined before boot ends has the macros too.
+    ActiveSupport.on_load(:action_controller) do
+      Packrat.guard("browser events") { include Packrat::Browser::Controller }
     end
 
     # The decision must come after every after_initialize block, so that an app that configures
