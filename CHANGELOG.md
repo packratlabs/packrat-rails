@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1
+
+- **Browser events name the user in more apps.** When your app has no `Current.user`, the script
+  reads the controller's `current_user`, which Clearance and Devise provide. It also sends
+  `admin: true` when the user's `admin?` returns `true`.
+
 ## 0.5.0
 
 - **Browser events.** The gem adds a script to every HTML page that sends page views, clicks,

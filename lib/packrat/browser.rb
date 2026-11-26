@@ -115,7 +115,7 @@ module Packrat
     def tag(env)
       nonce = nonce(env)
       %(<script defer src="#{ERB::Util.html_escape("#{env['SCRIPT_NAME']}#{PATH}")}" ) +
-        %(data-config="#{ERB::Util.html_escape(JSON.generate(settings.merge(user: user).compact, ascii_only: true))}") +
+        %(data-config="#{ERB::Util.html_escape(JSON.generate(settings.merge(user: user(env)).compact, ascii_only: true))}") +
         (nonce ? %( nonce="#{ERB::Util.html_escape(nonce)}") : "") + "></script>"
     end
 
@@ -140,10 +140,22 @@ module Packrat
       end
     end
 
-    def user
-      ::Current.user&.id&.to_s if defined?(::Current) && ::Current.respond_to?(:user)
+    def user(env)
+      person = signed_in(env)
+      return if person&.id.nil?
+
+      { id: person.id.to_s, admin: (true if person.respond_to?(:admin?) && person.admin? == true) }.compact
     rescue StandardError
       nil
+    end
+
+    # Current.user, else the public current_user that Clearance and Devise give a controller.
+    def signed_in(env)
+      person = ::Current.user if defined?(::Current) && ::Current.respond_to?(:user)
+      return person if person
+
+      controller = env["action_controller.instance"]
+      controller.current_user if controller.respond_to?(:current_user)
     end
 
     def nonce(env)

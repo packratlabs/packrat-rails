@@ -75,18 +75,54 @@ class BrowserTest < PackratTest
   end
 
   def test_the_config_names_the_signed_in_user
-    current = Class.new { def self.user = Struct.new(:id).new(42) }
-    Object.const_set(:Current, current)
+    Object.const_set(:Current, Class.new { def self.user = Struct.new(:id).new(42) })
 
-    assert_equal "42", data_config(middleware)["user"]
+    assert_equal({ "id" => "42" }, data_config(middleware)["user"])
   ensure
     Object.send(:remove_const, :Current) if defined?(::Current)
   end
 
-  def test_a_current_that_raises_names_no_user
-    Object.const_set(:Current, Class.new { def self.user = raise("no session") })
+  def test_the_config_marks_an_admin
+    Object.const_set(:Current, Class.new { def self.user = Struct.new(:id, :admin?).new(42, true) })
 
+    assert_equal({ "id" => "42", "admin" => true }, data_config(middleware)["user"])
+  ensure
+    Object.send(:remove_const, :Current) if defined?(::Current)
+  end
+
+  def test_without_a_current_user_the_controller_names_the_user
+    controller = Class.new(PagesController) { def current_user = Struct.new(:id, :admin?).new(9, false) }
+
+    assert_equal({ "id" => "9" }, data_config(middleware, with_controller(controller.new("show")))["user"])
+  end
+
+  def test_a_signed_out_controller_names_no_user
+    signed_out = Class.new(PagesController) { def current_user = nil }
+    hidden = Class.new(PagesController) do
+      private
+
+      def current_user = Struct.new(:id).new(9)
+    end
+
+    assert_nil data_config(middleware, with_controller(signed_out.new("show")))["user"]
+    assert_nil data_config(middleware, with_controller(hidden.new("show")))["user"]
+  end
+
+  def test_current_user_wins_over_the_controller
+    Object.const_set(:Current, Class.new { def self.user = Struct.new(:id).new(42) })
+    controller = Class.new(PagesController) { def current_user = Struct.new(:id).new(9) }
+
+    assert_equal({ "id" => "42" }, data_config(middleware, with_controller(controller.new("show")))["user"])
+  ensure
+    Object.send(:remove_const, :Current) if defined?(::Current)
+  end
+
+  def test_a_user_lookup_that_raises_names_no_user
+    Object.const_set(:Current, Class.new { def self.user = raise("no session") })
     assert_nil data_config(middleware)["user"]
+
+    controller = Class.new(PagesController) { def current_user = raise("no session") }
+    assert_nil data_config(middleware, with_controller(controller.new("show")))["user"]
   ensure
     Object.send(:remove_const, :Current) if defined?(::Current)
   end
@@ -188,8 +224,12 @@ class BrowserTest < PackratTest
     +"".tap { |html| middleware.call(request)[2].each { |part| html << part } }
   end
 
-  def data_config(middleware)
-    JSON.parse(CGI.unescapeHTML(page(middleware)[/data-config="([^"]+)"/, 1]))
+  def data_config(middleware, request = env)
+    JSON.parse(CGI.unescapeHTML(page(middleware, request)[/data-config="([^"]+)"/, 1]))
+  end
+
+  def with_controller(controller)
+    env.merge("action_controller.instance" => controller)
   end
 
   def assert_unchanged(middleware, request = env)

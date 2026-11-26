@@ -57,8 +57,11 @@ uses them to check a pull request that changes a page against what visitors did 
 
 Browser events are on by default and need no setup. The gem serves the script from your app at
 `/packrat/browser-<version>.js` and adds a `<script defer>` tag before `</head>`. It leaves alone
-responses that are not HTML, downloads, streamed responses and Turbo Frame requests. When your app
-has a `Current.user`, the script sends the user's `id`.
+responses that are not HTML, downloads, streamed responses and Turbo Frame requests.
+
+The script names the signed-in user, so you can find one person's sessions. It reads `Current.user`,
+or else the controller's `current_user`, which Clearance and Devise provide. It sends the user's `id`,
+and `admin: true` when `admin?` returns `true`, so Packrat can leave your staff's sessions out.
 
 To turn browser events off, set `config.browser` in `config/initializers/packrat.rb`:
 
