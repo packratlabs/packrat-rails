@@ -27,7 +27,7 @@ class BootTest < Minitest::Test
     assert_equal "configured", result["outcome"]
     assert_match %r{\A<script defer src="/packrat/browser-#{Packrat::VERSION}\.js" data-config="[^"]+" nonce="n0nce"></script>\z}, tag
     assert_includes result["page"], "#{tag}</head>"
-    assert_includes tag, "&quot;user&quot;:&quot;7&quot;"
+    assert_includes tag, "&quot;user&quot;:{&quot;id&quot;:&quot;7&quot;}"
     assert_includes result["csp"], "'nonce-n0nce'"
     refute_includes result["plain"], "<script"
     assert_equal 200, result["script_status"]

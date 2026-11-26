@@ -95,7 +95,7 @@ const start = (script) => {
       return true;
     },
   });
-  if (config.user) rum.setUser({ id: config.user });
+  if (config.user) rum.setUser(config.user);
 };
 
 try {
