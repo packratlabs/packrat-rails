@@ -96,6 +96,18 @@ class BrowserTest < PackratTest
     assert_equal({ "id" => "9" }, data_config(middleware, with_controller(controller.new("show")))["user"])
   end
 
+  def test_clearance_names_the_user
+    session = Struct.new(:current_user).new(Struct.new(:id, :admin?).new(5, true))
+
+    assert_equal({ "id" => "5", "admin" => true }, data_config(middleware, env.merge(clearance: session))["user"])
+  end
+
+  def test_devise_names_the_user
+    warden = Struct.new(:user).new(Struct.new(:id).new(6))
+
+    assert_equal({ "id" => "6" }, data_config(middleware, env.merge("warden" => warden))["user"])
+  end
+
   def test_a_signed_out_controller_names_no_user
     signed_out = Class.new(PagesController) { def current_user = nil }
     hidden = Class.new(PagesController) do
