@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.2
+
+- **Browser events name the user in apps on Clearance.** 0.5.1 read only a public `current_user`,
+  and Clearance makes it private. The script now reads Clearance's session and Devise's Warden
+  user directly.
+
 ## 0.5.1
 
 - **Browser events name the user in more apps.** When your app has no `Current.user`, the script

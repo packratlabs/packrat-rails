@@ -149,9 +149,12 @@ module Packrat
       nil
     end
 
-    # Current.user, else the public current_user that Clearance and Devise give a controller.
+    # Current.user, Clearance's session, Devise's Warden, or else a controller's public current_user.
+    # Warden#user reads the session only; it runs no authentication strategy.
     def signed_in(env)
       person = ::Current.user if defined?(::Current) && ::Current.respond_to?(:user)
+      person ||= env[:clearance].current_user if env[:clearance].respond_to?(:current_user)
+      person ||= env["warden"].user if env["warden"].respond_to?(:user)
       return person if person
 
       controller = env["action_controller.instance"]
