@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.3
+
+- **An email address in a URL is redacted when it is URL-encoded.** A query string such as
+  `email=jane%40example.com` was sent as is, because the email pattern needs a literal `@`. Each
+  query value is now decoded before the email, IP and `redact_patterns` checks run, in `url.query`,
+  `url.full`, `http.url` and `http.target`, on server and client spans alike.
+
 ## 0.5.2
 
 - **Browser events name the user in apps on Clearance.** 0.5.1 read only a public `current_user`,

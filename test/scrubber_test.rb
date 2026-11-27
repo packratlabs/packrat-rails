@@ -54,6 +54,35 @@ class ScrubberTest < PackratTest
     assert_equal "token=[REDACTED]&page=2", scrub("url.query" => "token=abc&page=2")["url.query"]
   end
 
+  def test_a_url_encoded_email_is_redacted_in_every_url_attribute
+    token = scrub("url.query" => "email=jane@example.com")["url.query"].delete_prefix("email=")
+
+    { "url.query" => "email=jane%40example.com&page=2",
+      "url.full" => "https://api.x.test/people?email=jane%40example.com&page=2",
+      "http.url" => "https://api.x.test/people?email=jane%40example.com&page=2",
+      "http.target" => "/signup?email=jane%40example.com&page=2" }.each do |key, value|
+      assert_equal value.sub("jane%40example.com", token), scrub(key => value)[key], key
+    end
+  end
+
+  def test_a_url_encoded_email_with_a_plus_is_redacted
+    scrubbed = scrub("url.query" => "email=jane%2Bx%40example.com")["url.query"]
+
+    assert_match(/\Aemail=\[email:\h{8}\]\z/, scrubbed)
+  end
+
+  def test_a_url_encoded_ipv6_address_is_masked
+    scrubbed = scrub("url.query" => "ip=2001%3Adb8%3A85a3%3A%3A8a2e%3A370%3A7334")["url.query"]
+
+    assert_equal "ip=2001:db8:85a3::", scrubbed
+  end
+
+  def test_an_encoded_value_with_nothing_to_redact_keeps_its_encoding
+    target = "/scrape?url=https%3A%2F%2Fexample.com%2Fa%26b&q=red%20shoes"
+
+    assert_equal target, scrub("http.target" => target)["http.target"]
+  end
+
   def test_a_parameter_that_only_contains_a_credential_word_is_left_alone
     target = "/colors?monkey=1&keyword=blue&tokenizer=x"
 

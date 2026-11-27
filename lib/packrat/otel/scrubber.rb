@@ -213,11 +213,25 @@ module Packrat
         return url if query.empty?
 
         redacted = query.split("&").map do |pair|
-          name, equals, _value = pair.partition("=")
+          name, equals, value = pair.partition("=")
           unescaped = CGI.unescape(name)
-          equals.empty? || !(CREDENTIAL_PARAM.match?(unescaped) || filtered?(unescaped)) ? pair : "#{name}=#{REDACTED}"
+          if equals.empty? then pair
+          elsif CREDENTIAL_PARAM.match?(unescaped) || filtered?(unescaped) then "#{name}=#{REDACTED}"
+          else "#{name}=#{redact_encoded(value)}"
+          end
         end
         "#{head}#{separator}#{redacted.join('&')}"
+      end
+
+      # An address sent as jane%40example.com has no @ until it is decoded.
+      def redact_encoded(value)
+        return value unless value.include?("%")
+
+        decoded = CGI.unescape(value)
+        redacted = redact_values(decoded)
+        return value if redacted == decoded
+
+        CGI.escape(redacted).gsub(/%5B|%5D|%3A/i) { |escaped| CGI.unescape(escaped) }
       end
 
       def filtered?(name)
